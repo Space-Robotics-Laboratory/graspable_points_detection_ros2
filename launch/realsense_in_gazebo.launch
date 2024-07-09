@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+
+  <!-- This launch file is created for launching these function with debug mode -->
+
+  <arg name="debug" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="headless" default="false"/>
+
+  <env name="GAZEBO_MODEL_PATH" value="$(find pcl_tutorials_ros)/models:$(optenv GAZEBO_MODEL_PATH)" /> 
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find pcl_tutorials_ros)/worlds/table.world"/>
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="headless" value="$(arg headless)"/>
+  </include>
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster" 
+    args="0 0 0 -1.570796 0 -1.570796 camera_link camera_depth_optical_frame " />
+  <node name="rviz" pkg="rviz" type="rviz" respawn="false" 
+    args="-d $(find pcl_tutorials_ros)/launch/config.rviz" output="screen" />
+
+</launch>

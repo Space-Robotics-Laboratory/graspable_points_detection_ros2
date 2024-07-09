@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+
+  <!-- These description executes relasense in gazebo simulation -->
+  <arg name="debug" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="headless" default="false"/>
+
+  <arg name="world_name" default="sample_for_detect_graspable_points.world"/>
+  <arg name="init_camera_pose" default="-x 0 -y 0.0 -z 0.0 -R 0 -P 0.0 -Y 0"/> 
+
+  <include file="$(find realsense_description)/launch/gazebo_realsense.launch">
+    <arg name="world_file_name" value="$(arg world_name)"/>
+    <arg name="init_pose" value="$(arg init_camera_pose)"/>
+  </include>
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster" 
+    args="0 0 0 -1.570796 0 -1.570796 camera_link camera_depth_optical_frame " />
+  <!-- <node name="rviz" pkg="rviz" type="rviz" respawn="false" 
+    args="-d $(find pcl_tutorials_ros)/launch/config.rviz" output="screen" /> -->
+
+</launch>
