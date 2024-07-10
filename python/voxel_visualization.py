@@ -6,7 +6,7 @@ import plotly.express as px
 
 
 
-vector3d_gripper_cpp = pd.read_csv("/home/srl-limb/ros2_ws/src/SRL_GraspableTargetDetection/detect_graspable_points/pcd_data/GripperMask.csv", names=["x","y","z"])
+vector3d_gripper_cpp = pd.read_csv("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/GripperMask.csv", names=["x","y","z"])
 
 
 #vector3d_gripper_cpp = pd.read_csv("/home/jitao/Documents/Results/Voxel_array/GripperMask_matlab_2.csv", names=["x","y","z"])
