@@ -75,8 +75,6 @@ private:
 		int threshold;
 		std::string delete_lower_targets;
 		float delete_lower_targets_threshold;
-		std::string interpolation;
-		std::string peaks; // peaks or not
 		float searching_radius_for_normal_and_curvature;
 		int extra_sheet;
 		float graspability_threshold;
@@ -218,6 +216,13 @@ private:
 
 	std::vector<std::vector<std::vector<int>>> vox_extract(const std::vector<std::vector<std::vector<int>>>& voxel_array ,const std::vector<int>& position_reference_point, const std::vector<int>& size_extracting);
 
+	/**
+	 * @function name : gripper_mask() 
+	 * @brief : makes the gripper_mask, which is the 3-dimensional array composed of 0 and 1 considering geometric parameters of the gripper.
+	 * @param voxel_size: length of one side of voxel [m]
+	 * @param gripper_param : geometric parameters of the gripper which are set in the config file.
+	 * @return gripper_mask : n*n*m array composed of 0 and 1.
+	 */	
 	std::vector<std::vector<std::vector<int>>> creategrippermask(GripperParam gripper_param, float voxel_size);
 	/**
 	 * @function name : gripper_mask() 
@@ -227,8 +232,6 @@ private:
 	 * @return gripper_mask : n*n*m array composed of 0 and 1.
 	 */	
 
-	void detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
-							const MatchingSettings& matching_settings);
 	/**
 	 * @function name : detectTerrainPeaks()
 	 * @brief : estimate the normal vectors of each point and compute the curvature, returns the points with the largest principal curvature eigenvalue
@@ -237,6 +240,9 @@ private:
 	 * @param peak_visualization_cloud : output cloud with the peaks
 	 * @return none
 	 */	
+	void detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> &peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
+							const MatchingSettings& matching_settings);
+
 
 	/**
 	 * @function name : voxel_matching() 

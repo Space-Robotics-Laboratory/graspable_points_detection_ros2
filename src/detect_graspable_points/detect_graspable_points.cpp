@@ -29,13 +29,13 @@ detect_graspable_points::detect_graspable_points()
 
   //Publisher
   downsampled_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/down_sample_points", 1);
-  interpolate_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> ("/interpolated_point", 1);
-  peaks_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> ("/peaks_of_convex_surface", 1);
-  graspability_map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> ("/graspability_map", 1);
-  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> ("/graspable_points_after_combined_criterion", 1); //graspable point
-  transformed_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> ("transformed_point", 1);
-  point_visualization_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> ("/detect_graspable_points/point_visualization_marker", 1);
-  marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> ("normal_vector", 1);
+  interpolate_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/interpolated_point", 1);
+  peaks_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/peaks_of_convex_surface", 1);
+  graspability_map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspability_map", 1);
+  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points_after_combined_criterion", 1); //graspable point
+  transformed_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/transformed_point", 1);
+  point_visualization_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/point_visualization_marker", 1);
+  marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/normal_vector", 1);
 }
 
 
@@ -45,12 +45,12 @@ detect_graspable_points::detect_graspable_points()
  *********************************/
 detect_graspable_points::~detect_graspable_points()
 {
-  ;
+
 }
 
 //******** CALLBACK *******//
 
-void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointCloud2 cloud_msg)
+void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointCloud2 received_cloud_msg)
 {
   // ****** PARAMETERS ******* //
 
@@ -112,13 +112,11 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
   // ****** General Parameters ******* //
 
   MatchingSettings matching_settings ={
-    0.001, // voxel size [m]
-    80, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
+    0.002, // voxel size [m]
+    120, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
     "on", // delete the targets whose z positions are lower than a limit value: on or off
     0.01, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
-    "on",  //interpolation: "on" or "off"
-    "on",  //trying to find the peaks of the terrain? on or off 
-    0.03, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
+    0.07, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
     3, // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
     90 // Graspability threshold. Above which we can call it graspable with great certainty
   };
@@ -129,35 +127,29 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
   std::cout << "start processing" << std::endl;
 
   auto start_overall = std::chrono::high_resolution_clock::now();
-  
-  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
 
   // ****** Downsampling ******* //
-  downsampling(cloud_msg, "downsampling_frame", cloud, matching_settings.voxel_size);
+  downsampling(received_cloud_msg, "downsampling_frame", downsampled_cloud, matching_settings.voxel_size);
 
   // ****** remove all the NaNs from pcd ******* //
   std::vector<int> indices;
-  pcl::removeNaNFromPointCloud(cloud, cloud, indices);
+  pcl::removeNaNFromPointCloud(downsampled_cloud, downsampled_cloud, indices);
 
   // ****** get the min values from the pcd, for offset re-transform ******* //
-  if(cloud.points.size() > 0) // If downsampled_points.points.size()==0, process will have segmentation fault
+  if(downsampled_cloud.points.size() > 0) // If downsampled_points.points.size()==0, process will have segmentation fault
   {
     // ****** Transform ******* //
     Eigen::Vector4f centroid_point;
     Eigen::Vector3f normal_vector;
     Eigen::Matrix3f rotation_matrix;
-    pcl::PointCloud<pcl::PointXYZ> new_pcl;
-
+    pcl::PointCloud<pcl::PointXYZ> transformed_pcl;
     auto start_transform = std::chrono::high_resolution_clock::now();
-
-    pcd_transform(cloud,new_pcl,centroid_point,rotation_matrix);  // /!\ modified downsampled_points to real cloud data 
-
+    pcd_transform(downsampled_cloud,transformed_pcl,centroid_point,rotation_matrix);  // /!\ modified downsampled_points to real cloud data 
     auto stop_transform = std::chrono::high_resolution_clock::now();
     auto duration_transform = std::chrono::duration_cast<std::chrono::microseconds>(stop_transform - start_transform);
-
     std::cout <<"Time for pcd_transform in µs : " << duration_transform.count() << std::endl;
 
-    
 
     // ****** Testing and Debug of Transformation ******* //
 
@@ -186,162 +178,78 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     cetroid_point_3f << centroid_point[0], centroid_point[1], centroid_point[2];
     // finish the description related to pcd_transform().
 
-    // **************************** //
-
     std::vector<std::vector<std::vector<int>>> voxel_matrix;  // important that size needs to be 0 in declaration for the resize to work properly
     std::vector<float> offset_vector_for_retransform;
     pcl::PointCloud<pcl::PointXYZRGB> peak_cloud;
+    sensor_msgs::msg::PointCloud2 peak_coordinates;
 
 
-    if (matching_settings.interpolation == "on") {
-        // ****** Interpolate ******* //
-        pcl::PointCloud<pcl::PointXYZ> pcl_for_testing_interpolation;
+    // ****** Interpolate ******* //
+    pcl::PointCloud<pcl::PointXYZ> interpolated_pcl;
+    auto start_interp = std::chrono::high_resolution_clock::now();
+    pcd_interpolate(transformed_pcl,interpolated_pcl);   
+    auto stop_interp = std::chrono::high_resolution_clock::now();
+    auto duration_interp = std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
+    std::cout <<"Time for pcd_interpolate in µs : " << duration_interp.count() << std::endl;
 
-        auto start_interp = std::chrono::high_resolution_clock::now();
+    // publish the pointcloud with respect to regrssion_plane_frame
+    sensor_msgs::msg::PointCloud2 interpolated_point_cloud_for_pub; 
+    pcl::toROSMsg(interpolated_pcl, interpolated_point_cloud_for_pub); 
+    interpolated_point_cloud_for_pub.header.frame_id="regression_plane_frame";
+    interpolated_point_cloud_for_pub.header.stamp = this->now();
+    interpolate_point_pub_->publish(interpolated_point_cloud_for_pub);
 
-        pcd_interpolate(new_pcl,pcl_for_testing_interpolation);   
-
-        auto stop_interp = std::chrono::high_resolution_clock::now();
-        auto duration_interp = std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
-
-        std::cout <<"Time for pcd_interpolate in µs : " << duration_interp.count() << std::endl;
-
-        // publish the pointcloud with respect to regrssion_plane_frame
-        sensor_msgs::msg::PointCloud2 interpolated_pointCloud;  // please change
-        pcl::toROSMsg(pcl_for_testing_interpolation, interpolated_pointCloud);  // new_pcl -> pcl_for_testing_interpolation
-        interpolated_pointCloud.header.frame_id="regression_plane_frame";
-        interpolated_pointCloud.header.stamp = this->now();
-        interpolate_point_pub_->publish(interpolated_pointCloud);
-
-        
-        // ****** Find the peaks ******* //
-
-        // if convex peak detection is set on
-        if (matching_settings.peaks == "on") {
-
-          sensor_msgs::msg::PointCloud2 peak_coordinates;
-        
-          std::cout <<"Start to find all peaks within the terrain map."<< std::endl;
-          detectTerrainPeaks(pcl_for_testing_interpolation, peak_cloud,peak_coordinates, matching_settings);
-          std::cout <<"finished detecting."<< std::endl;
+    // ****** Find the peaks ******* //        
+    detectTerrainPeaks(interpolated_pcl, peak_cloud,peak_coordinates, matching_settings);
 
 
-        }
+    // ****** Voxelize ******* //
+    auto start_voxel = std::chrono::high_resolution_clock::now();
+    voxel_matrix = pcd_voxelize(interpolated_pcl, matching_settings.voxel_size);
+    auto stop_voxel = std::chrono::high_resolution_clock::now();
+    auto duration_voxel = std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
+    std::cout <<"Time for pcd_voxelize in µs : " << duration_voxel.count() << std::endl;
 
-        // ****** Voxelize ******* //
-        auto start_voxel = std::chrono::high_resolution_clock::now();
-
-        voxel_matrix = pcd_voxelize(pcl_for_testing_interpolation, matching_settings.voxel_size);
-
-        auto stop_voxel = std::chrono::high_resolution_clock::now();
-        auto duration_voxel = std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
-
-        std::cout <<"Time for pcd_voxelize in µs : " << duration_voxel.count() << std::endl;
-
-        //get minimum values for re-transform later
-        offset_vector_for_retransform = getMinValues(pcl_for_testing_interpolation);
-
-
-    }
-    else {
-      // ****** If the Interpolation step is turned off ******* //
-
-      // ****** Find the peaks ******* //
-        if (matching_settings.peaks == "on") {
-
-          sensor_msgs::msg::PointCloud2 peak_coordinates;
-          std::cout <<"Start to find all peaks within the terrain map."<< std::endl;
-          detectTerrainPeaks(new_pcl,peak_cloud, peak_coordinates, matching_settings);
-          std::cout <<"finished detecting."<< std::endl;
-
-
-          peaks_pub_->publish(peak_coordinates);
-        }
-
-        // ****** Voxelize ******* //
-        
-        auto start_voxel = std::chrono::high_resolution_clock::now();
-        voxel_matrix = pcd_voxelize(new_pcl,matching_settings.voxel_size);
-
-        auto stop_voxel = std::chrono::high_resolution_clock::now();
-        auto duration_voxel = std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
-
-        std::cout <<"Time for pcd_voxelize in µs : " << duration_voxel.count() << std::endl;
-
-        //get minimum values for re-transform later
-        offset_vector_for_retransform = getMinValues(new_pcl);
-    }
-
-  
+    //get minimum values for re-transform later
+    offset_vector_for_retransform = getMinValues(interpolated_pcl);
 
     // ****** Gripper mask ******* //
-
-    //create an empty 3d array ready to use for gripper mask
     std::vector<std::vector<std::vector<int>>> gripper_mask(0, std::vector<std::vector<int>>(0, std::vector<int>(0,0)));
-
     gripper_mask = creategrippermask(gripper_param, matching_settings.voxel_size);
 
     // ****** Voxel matching ******* //
-
     // create an empty 2d array ready to use. it will be 4 columns: x, y, z and graspability score
     std::vector<std::vector<int>> graspable_points(0, std::vector<int>(0,0));
     auto start_matching = std::chrono::high_resolution_clock::now();
-
     graspable_points = voxel_matching(voxel_matrix, gripper_mask, matching_settings);
-
     auto stop_matching = std::chrono::high_resolution_clock::now();
     auto duration_matching = std::chrono::duration_cast<std::chrono::microseconds>(stop_matching - start_matching);
     std::cout <<"Time for voxel_matching in µs : " << duration_matching.count() << std::endl;
 
     // ****** Re-transform ******* //
 
-
     std::vector<std::vector<float>> graspable_points_after_retransform;
-
     // NOTE: Re-transform only to the regression plane frame, NOT to robot-based frame, for better visualization
     // If you want to further retransform to input camera depth optical frame, you have to modify the function
-
     graspable_points_after_retransform = pcd_re_transform(graspable_points, matching_settings.voxel_size, offset_vector_for_retransform);
 
-
     // ****** Visualization ******* //
-
     // ****** Color Gradient (Criterion I) ******* //
-
     // Turn the graspabiliy score to color gradient. Publish the pointcloud with respect to regression_plane_frame
-
     sensor_msgs::msg::PointCloud2 marker_of_graspable_points;
     marker_of_graspable_points = visualizeRainbow(graspable_points_after_retransform, matching_settings);
-
     std::cout <<"Output cloud with graspability color gradient created"<< std::endl;
-
     graspability_map_pub_->publish(marker_of_graspable_points);
 
     // ****** Curvature Combined (Criterion II) ******* //
-
     sensor_msgs::msg::PointCloud2 results_of_combined_analysis;
-
     // Searching distance for intersection between convex peaks and graspability maxima
     float distance_threshold = matching_settings.voxel_size;
-
     // combine Graspability maxima with convex shape analysis. output the intersection of both.
     results_of_combined_analysis = combinedAnalysis(graspable_points_after_retransform, peak_cloud, distance_threshold, matching_settings);
-
-    //std::cout <<"graspable points created with combined criterion"<< std::endl;
-
     combined_pub_->publish(results_of_combined_analysis);
 
-    // ****** Publish the transformed raw point cloud ******* //
-
-    // publish the pointcloud with respect to regrssion_plane_frame
-    sensor_msgs::msg::PointCloud2 pointcloud_wrt_regrssion_plane_frame;
-    pcl::toROSMsg(new_pcl, pointcloud_wrt_regrssion_plane_frame);
-    pointcloud_wrt_regrssion_plane_frame.header.frame_id="regression_plane_frame";
-    pointcloud_wrt_regrssion_plane_frame.header.stamp = this->now();
-    transformed_point_pub_->publish(pointcloud_wrt_regrssion_plane_frame);
-
     // ****** Overall time consumption ******* //
-
     auto stop_overall = std::chrono::high_resolution_clock::now();
     auto duration_overall = std::chrono::duration_cast<std::chrono::microseconds>(stop_overall - start_overall);
     std::cout <<"Total time in µs : " << duration_overall.count() << std::endl;
@@ -814,9 +722,6 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
     // 経過時間を計算（ミリ秒）
     std::chrono::duration<double, std::milli> elapsed = end - start;
     // 結果を表示
-    std::cout << "*  voxelized_pcd.resize(xmatrix_size, std::vector<std::vector<int>>(ymatrix_size, std::vector<int>(zmatrix_size,0))); \n#Time passed: " << elapsed.count() << " ms" << std::endl;
-  // resize the matrix and fills it with 0 
-
   int voxel_index_x,voxel_index_y,voxel_index_z;
 
 
@@ -1024,7 +929,7 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::creategrippe
 
 // ****** CURVATURE ANALYSIS ******* //
 
-void detect_graspable_points::detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
+void detect_graspable_points::detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> &peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
                                                 const MatchingSettings& matching_settings)
      {
     
@@ -1096,9 +1001,6 @@ void detect_graspable_points::detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> 
     pcl::toROSMsg(peak_visualization_cloud, cloud_msg);
     cloud_msg.header.frame_id="regression_plane_frame";
     cloud_msg.header.stamp = this->now();
-
-    std::cout <<"peaks detected"<< std::endl;
-
 }
 
 // ****** VOXEL MATCHING ******* //
@@ -1117,7 +1019,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
     // 経過時間を計算（ミリ秒）
     std::chrono::duration<double, std::milli> elapsed = end - start;
     // 結果を表示
-    std::cout << "************std::vector<std::vector<std::vector<int>>> searching_voxel_array = terrain_matrix;\n###処理時間: " << elapsed.count() << " ミリ秒" << std::endl;
+    std::cout << "************"<< elapsed.count() << " ミリ秒" << std::endl;
 
     
     // size_of_voxel_array is a 3 element std::vector filled with the sizes of terrain_matrix
@@ -1225,7 +1127,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
         else if (number_of_matching_voxels <= matching_settings.threshold && graspability >= 60) {
             searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability - (((matching_settings.threshold - number_of_matching_voxels)*1.0)/(matching_settings.threshold*1.0))*100;
             //std::cout << "Below threshold! Graspability: " << searching_solid_voxels_map[3][index_of_voxel_being_compared] <<std::endl;
-         }
+        }
         else {
           searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
         }
@@ -1238,8 +1140,8 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 
     // Crop the remaining 0 column
     searching_solid_voxels_map.erase(std::remove_if(searching_solid_voxels_map.begin(), searching_solid_voxels_map.end(),
-                                           [](const std::vector<int>& matching) { return std::all_of(matching.begin(), matching.end(), [](int value) { return value == 0; }); }),
-                            searching_solid_voxels_map.end());
+                                      [](const std::vector<int>& matching) { return std::all_of(matching.begin(), matching.end(), [](int value) { return value == 0; }); }),
+                                      searching_solid_voxels_map.end());
     
 
     //Correct the position of the voxel array of the terrain matrix
@@ -1247,12 +1149,12 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
     int max_z_position = z_max;
   
     for (auto& matching : searching_solid_voxels_map) {
-        matching[2] = -matching[2] + max_z_position;
-    }
+      matching[2] = -matching[2] + max_z_position;
+      }
 
     voxel_coordinates_of_graspable_points = searching_solid_voxels_map;
     
-    return voxel_coordinates_of_graspable_points;
+  return voxel_coordinates_of_graspable_points;
 
 }
 
