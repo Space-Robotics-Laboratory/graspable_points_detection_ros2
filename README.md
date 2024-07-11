@@ -26,7 +26,7 @@ You will require the following packages and libraries:
 *   Eigen3
 
 
-## Installation of LibInterpolate that worked for me
+## Installation of LibInterpolate
 
 ```
 git clone https://github.com/CD3/libInterpolate
@@ -86,7 +86,8 @@ We will first test the algorithm on some examples. You will need at least three 
 
 Launch the graspable target detection.
 ```
-cd
+cd ~/ros2_ws
+source install/setup.bash
 ros2 run detect_graspable_points detect_graspable_points_main 
 ```
 The algorithm subscribes to a point cloud message `merged_pcd` in `sensor_msgs/PointCloud2` format. So in principle, you can subscribe to any tope
@@ -95,7 +96,8 @@ The algorithm subscribes to a point cloud message `merged_pcd` in `sensor_msgs/P
 
 Publish stored example point cloud.
 ```
-cd
+cd ~/ros2_ws
+source install/setup.bash
 ros2 run detect_graspable_points publish_pointcloud2
 ```
 Now, a point cloud in *.pcd* format will be published once per second as `sensor_msgs/PointCloud2` message under the topic `/merged_pcd` in the `regression_plane_frame` coordinate frame.
@@ -111,7 +113,11 @@ You can freely choose which topic you want to visualize, whether that is the raw
 
 ### Input Point Cloud
 
-Copy the point cloud you want to examine into the folder `detect_graspable_points/src/pcd_data/` and change the path in the program `publish_pointcloud2.cpp`. Make sure that it is in .pcd format. Of course the algorithm can also subscribe to any PointCloud2 message with the name `merged_pcd` coming from other nodes.
+Copy the point cloud you want to examine into the folder `detect_graspable_points/src/pcd_data/` and change the path in the program `publish_pointcloud2.cpp`. Make sure that it is in .pcd format. Of course the algorithm can also subscribe to any PointCloud2 message with the name `/merged_pcd` coming from other nodes.
+
+## Output
+
+This package output several data for visualization. If you are only interested in the graspable point it is pulished as `/detect_graspable_point/graspable_points`.
 
 ### Gripper Parameters
 
@@ -146,11 +152,9 @@ The matching parameters are the most essential parameters for the graspability a
 | 2   | Threshold of Solid Voxels                      | int             |
 | 3   | Delete lower targets                           | String (on/off) |
 | 4   | Delete lower targets z-threshold               | float [m]       |
-| 5   | Interpolation                                  | String (on/off) |
-| 6   | Convex peaks detection                         | String (on/off) |
-| 7   | Curvature searching radius                     | float [m]       |
-| 8   | Auxiliary void voxel layers above gripper mask | int             |
-| 9   | Graspability threshold                         | int             |
+| 5   | Curvature searching radius                     | float [m]       |
+| 6   | Auxiliary void voxel layers above gripper mask | int             |
+| 7   | Graspability threshold                         | int             |
 
 
 ## Troubleshooting

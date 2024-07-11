@@ -32,7 +32,7 @@ detect_graspable_points::detect_graspable_points()
   interpolate_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/interpolated_point", 1);
   peaks_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/peaks_of_convex_surface", 1);
   graspability_map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspability_map", 1);
-  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points_after_combined_criterion", 1); //graspable point
+  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points", 1); //graspable point
   transformed_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/transformed_point", 1);
   point_visualization_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/point_visualization_marker", 1);
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/normal_vector", 1);
@@ -123,9 +123,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
 
   // ************************** //
-  
   std::cout << "start processing" << std::endl;
-
   auto start_overall = std::chrono::high_resolution_clock::now();
   pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
 
@@ -172,7 +170,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
     // publish the 3D centroid point for debug
     visualizePoint(centroid_point[0], centroid_point[1], centroid_point[2], "centroid_point", "camera_depth_optical_frame");
-  
+
     // puvlish the normal std::vector for debug
     Eigen::Vector3f cetroid_point_3f;  
     cetroid_point_3f << centroid_point[0], centroid_point[1], centroid_point[2];
@@ -277,8 +275,6 @@ std::vector<float> detect_graspable_points::getMinValues(const pcl::PointCloud<p
     return minValues;
 }
 
-
-
 void detect_graspable_points::tf_broadcast(const std::string frame_id)
 {
     static tf2_ros::TransformBroadcaster br=tf2_ros::TransformBroadcaster(this);
@@ -298,7 +294,6 @@ void detect_graspable_points::tf_broadcast(const std::string frame_id)
     br.sendTransform(transformStamped);
 }
 
-
 void detect_graspable_points::tf_broadcast_from_pose(const std::string parant_frame_id, const std::string child_frame_id_to, geometry_msgs::msg::Pose relative_pose_between_frame)
 {
   //static tf2_ros::TransformBroadcaster br;
@@ -316,10 +311,8 @@ void detect_graspable_points::tf_broadcast_from_pose(const std::string parant_fr
   dynamic_tf.sendTransform(transformStamped);
 }
 
-
 void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector3D, const std::string& filename) 
 {
-
   std::ofstream outFile(filename);
   if (!outFile) 
   {
@@ -342,7 +335,6 @@ void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector
   outFile.close();
   std::cout << "3D std::vector saved to file: " << filename << std::endl;
 }
-
 
 void detect_graspable_points::visualizePoint(const double x, const double y, const double z, const std::string object_name, const std::string frame_id)
 {
@@ -367,14 +359,12 @@ void detect_graspable_points::visualizePoint(const double x, const double y, con
   visualization_point.pose.orientation.w = 1.0;  
   visualization_point.header.stamp = this->now();
   visualization_point.lifetime = rclcpp::Duration::from_nanoseconds(0);
-
   for(int i=0; i<10; i++)
   {
     point_visualization_marker_pub_->publish(visualization_point);
     rclcpp::Duration::from_seconds(0.1);
   }
 }
-
 
 void detect_graspable_points::visualizeVector(const Eigen::Vector3f &vector_of_start_point, const Eigen::Vector3f &vector_of_end_point, const std::string object_name, const std::string frame_id)
 {
@@ -426,59 +416,56 @@ std::vector<int> subtractInteger(const std::vector<int>& vector, int num)
   return result;
 }
 
-
 // ****** DOWNSAMPLING ******* //
 
 void detect_graspable_points::downsampling(const sensor_msgs::msg::PointCloud2 & cloud_msg, const std::string frame_id, pcl::PointCloud<pcl::PointXYZ> &filtered_points, const float cube_size)
 {
-    // VoxelGrid filtering
-    // Ref: http://www.pointclouds.org/documentation/tutorials/voxel_grid.php#voxelgrid
+  // VoxelGrid filtering
+  // Ref: http://www.pointclouds.org/documentation/tutorials/voxel_grid.php#voxelgrid
 
-    // Container for original & filtered data
-    pcl::PCLPointCloud2::Ptr cloud (new pcl::PCLPointCloud2 ());
-    pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
-    // Convert to PCL data type
-    pcl_conversions::toPCL(cloud_msg, *cloud);
+  // Container for original & filtered data
+  pcl::PCLPointCloud2::Ptr cloud (new pcl::PCLPointCloud2 ());
+  pcl::PCLPointCloud2::Ptr cloud_filtered (new pcl::PCLPointCloud2 ());
+  // Convert to PCL data type
+  pcl_conversions::toPCL(cloud_msg, *cloud);
 
-    // Perform the actual filtering
-    pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud (cloud);
-    sor.setLeafSize (cube_size, cube_size, cube_size);
-    sor.filter (*cloud_filtered);
+  // Perform the actual filtering
+  pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+  sor.setInputCloud (cloud);
+  sor.setLeafSize (cube_size, cube_size, cube_size);
+  sor.filter (*cloud_filtered);
 
-    // Convert to ROS data type
-    sensor_msgs::msg::PointCloud2 output;
-    pcl_conversions::moveFromPCL(*cloud_filtered, output);
-    output.header.frame_id = frame_id;
-    // Publish the data
-    downsampled_points_pub_->publish(output);
+  // Convert to ROS data type
+  sensor_msgs::msg::PointCloud2 output;
+  pcl_conversions::moveFromPCL(*cloud_filtered, output);
+  output.header.frame_id = frame_id;
+  // Publish the data
+  downsampled_points_pub_->publish(output);
 
-    // get filtered_points as this function's output
-    // But this is cause of segmentation fault
-    // pcl::fromROSMsg (output, filtered_points);
+  // get filtered_points as this function's output
+  // But this is cause of segmentation fault
+  // pcl::fromROSMsg (output, filtered_points);
 
-    // convert from pcl::PCLPointCloud2 to pcl::PointCloud<pcl::PointXYZ> through sensor_msgs::PointCloud
-    pcl::PointCloud<pcl::PointXYZ> cloud_filtered_by_PC1;
-    //sensor_msgs::convertPointCloud2ToPointCloud(output, cloud_filtered_by_PC1);
+  // convert from pcl::PCLPointCloud2 to pcl::PointCloud<pcl::PointXYZ> through sensor_msgs::PointCloud
+  pcl::PointCloud<pcl::PointXYZ> cloud_filtered_by_PC1;
+  //sensor_msgs::convertPointCloud2ToPointCloud(output, cloud_filtered_by_PC1);
 
-    pcl::fromROSMsg (output, cloud_filtered_by_PC1);
-    if(cloud_filtered_by_PC1.points.size() > 0)
+  pcl::fromROSMsg (output, cloud_filtered_by_PC1);
+  if(cloud_filtered_by_PC1.points.size() > 0)
+  {
+    for(auto &filtered_point_by_PC1 : cloud_filtered_by_PC1.points)
     {
-      for(auto &filtered_point_by_PC1 : cloud_filtered_by_PC1.points)
-      {
-        pcl::PointXYZ filtered_point;
-        filtered_point.x = filtered_point_by_PC1.x;
-        filtered_point.y = filtered_point_by_PC1.y;
-        filtered_point.z = filtered_point_by_PC1.z;
-        filtered_points.push_back(filtered_point);
-      }
+      pcl::PointXYZ filtered_point;
+      filtered_point.x = filtered_point_by_PC1.x;
+      filtered_point.y = filtered_point_by_PC1.y;
+      filtered_point.z = filtered_point_by_PC1.z;
+      filtered_points.push_back(filtered_point);
     }
-
-    // publish TF for visualization
-    const std::string downsampling_frame_ID = "downsampling_frame";
-    // to shift positions of rendering point clouds
-    tf_broadcast(downsampling_frame_ID);
-
+  }
+  // publish TF for visualization
+  const std::string downsampling_frame_ID = "downsampling_frame";
+  // to shift positions of rendering point clouds
+  tf_broadcast(downsampling_frame_ID);
 }
 
 // ****** REGRESSION PLANE ******* //
@@ -881,7 +868,6 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::creategrippe
 void detect_graspable_points::detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> &peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
                                                 const MatchingSettings& matching_settings)
   {
-  
   // This function carries out a convex peak detection using curvature analysis. First, we compute the surface normal vectors
   // of each point in a defined radius "searching_radius_for_normal_and_curvature". Next, we compute the respective principal
   // curvatures k1 and k2. Convex peaks are defined as points with an positive k1, k2 and k1*k2=K (Gaussian curvature).
