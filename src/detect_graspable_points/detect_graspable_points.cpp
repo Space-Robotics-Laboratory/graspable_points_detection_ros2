@@ -116,7 +116,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     120, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
     "on", // delete the targets whose z positions are lower than a limit value: on or off
     0.01, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
-    0.07, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
+    0.03, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
     3, // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
     90 // Graspability threshold. Above which we can call it graspable with great certainty
   };
@@ -171,9 +171,6 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // publish the 3D centroid point for debug
     visualizePoint(centroid_point[0], centroid_point[1], centroid_point[2], "centroid_point", "camera_depth_optical_frame");
 
-    // puvlish the normal std::vector for debug
-    Eigen::Vector3f cetroid_point_3f;  
-    cetroid_point_3f << centroid_point[0], centroid_point[1], centroid_point[2];
     // finish the description related to pcd_transform().
 
     std::vector<std::vector<std::vector<int>>> voxel_matrix;  // important that size needs to be 0 in declaration for the resize to work properly
@@ -220,6 +217,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     std::vector<std::vector<int>> graspable_points(0, std::vector<int>(0,0));
     auto start_matching = std::chrono::high_resolution_clock::now();
     graspable_points = voxel_matching(voxel_matrix, gripper_mask, matching_settings);
+    std::cout<<"Size of graspable after voxel_matching"<<graspable_points[0].size() <<std::endl;
     auto stop_matching = std::chrono::high_resolution_clock::now();
     auto duration_matching = std::chrono::duration_cast<std::chrono::microseconds>(stop_matching - start_matching);
     std::cout <<"Time for voxel_matching in µs : " << duration_matching.count() << std::endl;
@@ -251,47 +249,47 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     auto stop_overall = std::chrono::high_resolution_clock::now();
     auto duration_overall = std::chrono::duration_cast<std::chrono::microseconds>(stop_overall - start_overall);
     std::cout <<"Total time in µs : " << duration_overall.count() << std::endl;
-    
   }
 }
 
 
 // ****** SECONDARY FUNCTIONS ******* //
 
-std::vector<float> detect_graspable_points::getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud) {
-    std::vector<float> minValues(3);
-    std::vector<float> x,y,z;
-    pcl::PointXYZ point; //variable for storing point values temporary before adding to pcl
-    for (int i = 0; i < pointCloud.size(); ++i)
-    {
-      point = pointCloud.points[i];
-      x.push_back(point.x);
-      y.push_back(point.y);
-      z.push_back(point.z);
-    }
-    minValues[0]= *min_element(x.begin(),x.end());
-    minValues[1]= *min_element(y.begin(),y.end());
-    minValues[2]= *min_element(z.begin(),z.end());
-    return minValues;
+std::vector<float> detect_graspable_points::getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud)
+{
+  std::vector<float> minValues(3);
+  std::vector<float> x,y,z;
+  pcl::PointXYZ point; //variable for storing point values temporary before adding to pcl
+  for (int i = 0; i < pointCloud.size(); ++i)
+  {
+    point = pointCloud.points[i];
+    x.push_back(point.x);
+    y.push_back(point.y);
+    z.push_back(point.z);
+  }
+  minValues[0]= *min_element(x.begin(),x.end());
+  minValues[1]= *min_element(y.begin(),y.end());
+  minValues[2]= *min_element(z.begin(),z.end());
+  return minValues;
 }
 
 void detect_graspable_points::tf_broadcast(const std::string frame_id)
 {
-    static tf2_ros::TransformBroadcaster br=tf2_ros::TransformBroadcaster(this);
-    geometry_msgs::msg::TransformStamped transformStamped;
-    transformStamped.header.stamp = this->now();
-    transformStamped.header.frame_id = "camera_depth_optical_frame";
-    transformStamped.child_frame_id = frame_id;
-    transformStamped.transform.translation.x = 2.0;
-    transformStamped.transform.translation.y = 0.0;
-    transformStamped.transform.translation.z = 0.0;
-    tf2::Quaternion q;
-    q.setRPY(0, 0, 0);
-    transformStamped.transform.rotation.x = q.x();
-    transformStamped.transform.rotation.y = q.y();
-    transformStamped.transform.rotation.z = q.z();
-    transformStamped.transform.rotation.w = q.w();
-    br.sendTransform(transformStamped);
+  static tf2_ros::TransformBroadcaster br=tf2_ros::TransformBroadcaster(this);
+  geometry_msgs::msg::TransformStamped transformStamped;
+  transformStamped.header.stamp = this->now();
+  transformStamped.header.frame_id = "camera_depth_optical_frame";
+  transformStamped.child_frame_id = frame_id;
+  transformStamped.transform.translation.x = 2.0;
+  transformStamped.transform.translation.y = 0.0;
+  transformStamped.transform.translation.z = 0.0;
+  tf2::Quaternion q;
+  q.setRPY(0, 0, 0);
+  transformStamped.transform.rotation.x = q.x();
+  transformStamped.transform.rotation.y = q.y();
+  transformStamped.transform.rotation.z = q.z();
+  transformStamped.transform.rotation.w = q.w();
+  br.sendTransform(transformStamped);
 }
 
 void detect_graspable_points::tf_broadcast_from_pose(const std::string parant_frame_id, const std::string child_frame_id_to, geometry_msgs::msg::Pose relative_pose_between_frame)
@@ -938,135 +936,131 @@ void detect_graspable_points::detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> 
 
 std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix, const std::vector<std::vector<std::vector<int>>>& gripper_mask, const MatchingSettings& matching_settings)
 {
-    // ****** preparations ******* //
-    // Copy inputted terrain data
-    auto start = std::chrono::high_resolution_clock::now();
-    std::vector<std::vector<std::vector<int>>> searching_voxel_array = terrain_matrix;
-    auto end = std::chrono::high_resolution_clock::now();
+  // ****** preparations ******* //
+  // Copy inputted terrain data
+  auto start = std::chrono::high_resolution_clock::now();
+  std::vector<std::vector<std::vector<int>>> searching_voxel_array = terrain_matrix;
+  auto end = std::chrono::high_resolution_clock::now();
 
-    // 経過時間を計算（ミリ秒）
-    std::chrono::duration<double, std::milli> elapsed = end - start;
-    // 結果を表示
-    std::cout << "************"<< elapsed.count() << " ミリ秒" << std::endl;
+  // 経過時間を計算（ミリ秒）
+  std::chrono::duration<double, std::milli> elapsed = end - start;
+  // 結果を表示
+  std::cout << "************"<< elapsed.count() << " ミリ秒" << std::endl;
 
-    // size_of_voxel_array is a 3 element std::vector filled with the sizes of terrain_matrix
-    std::vector<int> size_of_voxel_array = {static_cast<int>(terrain_matrix.size()), static_cast<int>(terrain_matrix[0].size()), static_cast<int>(terrain_matrix[0][0].size())};
-    std::vector<int> size_of_gripper_mask = {static_cast<int>(gripper_mask.size()), static_cast<int>(gripper_mask[0].size()), static_cast<int>(gripper_mask[0][0].size())};
-    std::vector<int> half_size_of_gripper_mask = {static_cast<int>(size_of_gripper_mask[0] / 2), static_cast<int>(size_of_gripper_mask[1] / 2), static_cast<int>(size_of_gripper_mask[2] / 2)};
+  // size_of_voxel_array is a 3 element std::vector filled with the sizes of terrain_matrix
+  std::vector<int> size_of_voxel_array = {static_cast<int>(terrain_matrix.size()), static_cast<int>(terrain_matrix[0].size()), static_cast<int>(terrain_matrix[0][0].size())};
+  std::vector<int> size_of_gripper_mask = {static_cast<int>(gripper_mask.size()), static_cast<int>(gripper_mask[0].size()), static_cast<int>(gripper_mask[0][0].size())};
+  std::vector<int> half_size_of_gripper_mask = {static_cast<int>(size_of_gripper_mask[0] / 2), static_cast<int>(size_of_gripper_mask[1] / 2), static_cast<int>(size_of_gripper_mask[2] / 2)};
 
-    // Save z subscript of solid voxels. first, find indices and values of nonzero elements in the terrain_matrix. then,
-    // convert linear indices to subscripts
-    int z_max = 0;
+  // Save z subscript of solid voxels. first, find indices and values of nonzero elements in the terrain_matrix. then,
+  // convert linear indices to subscripts
+  int z_max = 0;
 
-    for (int i = 0; i < size_of_voxel_array[0]; ++i) {
-        for (int j = 0; j < size_of_voxel_array[1]; ++j) {
-            for (int k = 0; k < size_of_voxel_array[2]; ++k) {
-                if (terrain_matrix[i][j][k] != 0) {
-                    if (k > z_max) {
-                      z_max = k;
-                    }
-                }
-            }
-        }
-    }
-
-    // Now, insert empty voxel layers in z-direction bottom, minus the auxiliary gripper mask layers
-    std::vector<int> placeholderZeros(size_of_gripper_mask[2]-matching_settings.extra_sheet, 0);
-
-    for (int i = 0; i < size_of_voxel_array[0]; ++i) {
-        for (int j = 0; j < size_of_voxel_array[1]; ++j) {
-            terrain_matrix[i][j].insert(terrain_matrix[i][j].begin(), placeholderZeros.begin(), placeholderZeros.end());
-        }
-    }
-
-    // Crop edges of the searching voxel array
-    searching_voxel_array = vox_clip(half_size_of_gripper_mask[0]+1, half_size_of_gripper_mask[1]+1, searching_voxel_array);
-
-    // Find all "ones" (solid voxels) in the search voxel array and change indexes to subscripts of solid voxels
-    std::vector<int> size_of_searching_voxel_array = {static_cast<int>(searching_voxel_array.size()), static_cast<int>(searching_voxel_array[0].size()), static_cast<int>(searching_voxel_array[0][0].size())};
-    Subscripts subscripts_of_searching_solid_voxels;
-
-    for (int i = 0; i < size_of_searching_voxel_array[0]; ++i) {
-        for (int j = 0; j < size_of_searching_voxel_array[1]; ++j) {
-            for (int k = 0; k < size_of_searching_voxel_array[2]; ++k) {
-                if (searching_voxel_array[i][j][k] != 0) {
-                    subscripts_of_searching_solid_voxels.x.push_back(i);
-                    subscripts_of_searching_solid_voxels.y.push_back(j);
-                    subscripts_of_searching_solid_voxels.z.push_back(k);
-                }
-            }
-        }
-    }
-
-    // Correct the positions of searching voxels
-    subscripts_of_searching_solid_voxels.x = subtractInteger(subscripts_of_searching_solid_voxels.x, half_size_of_gripper_mask[0]);
-    subscripts_of_searching_solid_voxels.y = subtractInteger(subscripts_of_searching_solid_voxels.y, half_size_of_gripper_mask[1]);
-    int number_of_solid_voxels_in_searching_voxel_array = subscripts_of_searching_solid_voxels.x.size();
-
-    // Prepare for loop
-    std::vector<std::vector<int>> searching_solid_voxels_map(4, std::vector<int>(number_of_solid_voxels_in_searching_voxel_array));
-    std::cout <<"Size of number_of_solid_voxels_in_searching_voxel_array:"<< number_of_solid_voxels_in_searching_voxel_array << std::endl;
-    
-    // Great loop
-    for (int index_of_voxel_being_compared = 0; index_of_voxel_being_compared < number_of_solid_voxels_in_searching_voxel_array; ++index_of_voxel_being_compared) 
-    {
-        std::vector<std::vector<std::vector<int>>> subset_of_voxel_array;
-        // Extract subset in the same size of the gripper mask from the data voxel array
-        subset_of_voxel_array = vox_extract(terrain_matrix,
-                                            {subscripts_of_searching_solid_voxels.x[index_of_voxel_being_compared],
-                                            subscripts_of_searching_solid_voxels.y[index_of_voxel_being_compared],
-                                            subscripts_of_searching_solid_voxels.z[index_of_voxel_being_compared]},
-                                            size_of_gripper_mask);
-
-        // Initialize and count the number of voxels inside subset
-        int number_of_matching_voxels = 0;
-        for (const auto& row : subset_of_voxel_array) {
-            for (const auto& col : row) 
-            {
-                number_of_matching_voxels += std::accumulate(col.begin(), col.end(), 0);
-            }
-        }
-        // Compare the two arrays subset and gripper mask and check whether they match or not
-        // returns the graspability score, which is an indicator for the suitability for grasping at this point
-        float graspability = vox_evaluate(number_of_matching_voxels, subset_of_voxel_array, gripper_mask);
-
-        // Fill in the point into the output data set
-        searching_solid_voxels_map[0][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.x[index_of_voxel_being_compared] + half_size_of_gripper_mask[0];
-        searching_solid_voxels_map[1][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.y[index_of_voxel_being_compared] + half_size_of_gripper_mask[1];
-        searching_solid_voxels_map[2][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.z[index_of_voxel_being_compared];
-        
-        // The forth column of the output data set is the graspability score. It is reduced by a penalty ratio
-        // if the number of solid terrain voxels inside the subset is below a thershold (Threshold of Solid Voxels, TSV)
-        if (number_of_matching_voxels > matching_settings.threshold) {
-            //std::cout <<"number of matching voxels exceeded the threshold" << std::endl;
-            searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
+  for (int i = 0; i < size_of_voxel_array[0]; ++i) {
+    for (int j = 0; j < size_of_voxel_array[1]; ++j) {
+      for (int k = 0; k < size_of_voxel_array[2]; ++k) {
+        if (terrain_matrix[i][j][k] != 0) {
+          if (k > z_max) {
+            z_max = k;
           }
-        // We only penalize those points which has a erroneous high graspability score
-        else if (number_of_matching_voxels <= matching_settings.threshold && graspability >= 60) {
-            searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability - (((matching_settings.threshold - number_of_matching_voxels)*1.0)/(matching_settings.threshold*1.0))*100;
-            //std::cout << "Below threshold! Graspability: " << searching_solid_voxels_map[3][index_of_voxel_being_compared] <<std::endl;
         }
-        else {
-          searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
-        }
+      }
+    }
+  }
 
+  // Now, insert empty voxel layers in z-direction bottom, minus the auxiliary gripper mask layers
+  std::vector<int> placeholderZeros(size_of_gripper_mask[2]-matching_settings.extra_sheet, 0);
+
+  for (int i = 0; i < size_of_voxel_array[0]; ++i) {
+    for (int j = 0; j < size_of_voxel_array[1]; ++j) {
+      terrain_matrix[i][j].insert(terrain_matrix[i][j].begin(), placeholderZeros.begin(), placeholderZeros.end());
     }
+  }
+
+  // Crop edges of the searching voxel array
+  searching_voxel_array = vox_clip(half_size_of_gripper_mask[0]+1, half_size_of_gripper_mask[1]+1, searching_voxel_array);
+
+  // Find all "ones" (solid voxels) in the search voxel array and change indexes to subscripts of solid voxels
+  std::vector<int> size_of_searching_voxel_array = {static_cast<int>(searching_voxel_array.size()), static_cast<int>(searching_voxel_array[0].size()), static_cast<int>(searching_voxel_array[0][0].size())};
+  Subscripts subscripts_of_searching_solid_voxels;
+
+  for (int i = 0; i < size_of_searching_voxel_array[0]; ++i) {
+    for (int j = 0; j < size_of_searching_voxel_array[1]; ++j) {
+      for (int k = 0; k < size_of_searching_voxel_array[2]; ++k) {
+        if (searching_voxel_array[i][j][k] != 0) {
+          subscripts_of_searching_solid_voxels.x.push_back(i);
+          subscripts_of_searching_solid_voxels.y.push_back(j);
+          subscripts_of_searching_solid_voxels.z.push_back(k);
+        }
+      }
+    }
+  }
+  // Correct the positions of searching voxels
+  subscripts_of_searching_solid_voxels.x = subtractInteger(subscripts_of_searching_solid_voxels.x, half_size_of_gripper_mask[0]);
+  subscripts_of_searching_solid_voxels.y = subtractInteger(subscripts_of_searching_solid_voxels.y, half_size_of_gripper_mask[1]);
+  int number_of_solid_voxels_in_searching_voxel_array = subscripts_of_searching_solid_voxels.x.size();
+
+  // Prepare for loop
+  std::vector<std::vector<int>> searching_solid_voxels_map(4, std::vector<int>(number_of_solid_voxels_in_searching_voxel_array));
+  std::cout <<"Size of number_of_solid_voxels_in_searching_voxel_array:"<< number_of_solid_voxels_in_searching_voxel_array << std::endl;
     
-    // End of the great loop
-    std::vector<std::vector<int>> voxel_coordinates_of_graspable_points;
-    // Crop the remaining 0 column
-    searching_solid_voxels_map.erase(std::remove_if(searching_solid_voxels_map.begin(), searching_solid_voxels_map.end(),
-                                      [](const std::vector<int>& matching) { return std::all_of(matching.begin(), matching.end(), [](int value) { return value == 0; }); }),
-                                      searching_solid_voxels_map.end());
-    //Correct the position of the voxel array of the terrain matrix
-    //because we make the voxel array in the reverse direction in pcd_voxelize.m
-    int max_z_position = z_max;
-  
-    for (auto& matching : searching_solid_voxels_map) 
-    {
-      matching[2] = -matching[2] + max_z_position;
+  // Great loop
+  for (int index_of_voxel_being_compared = 0; index_of_voxel_being_compared < number_of_solid_voxels_in_searching_voxel_array; ++index_of_voxel_being_compared) 
+  {
+    std::vector<std::vector<std::vector<int>>> subset_of_voxel_array;
+    // Extract subset in the same size of the gripper mask from the data voxel array
+    subset_of_voxel_array = vox_extract(terrain_matrix,
+                                        {subscripts_of_searching_solid_voxels.x[index_of_voxel_being_compared],
+                                        subscripts_of_searching_solid_voxels.y[index_of_voxel_being_compared],
+                                        subscripts_of_searching_solid_voxels.z[index_of_voxel_being_compared]},
+                                        size_of_gripper_mask);
+
+    // Initialize and count the number of voxels inside subset
+    int number_of_matching_voxels = 0;
+    for (const auto& row : subset_of_voxel_array) {
+      for (const auto& col : row) 
+      {
+        number_of_matching_voxels += std::accumulate(col.begin(), col.end(), 0);
+      }
     }
-    voxel_coordinates_of_graspable_points = searching_solid_voxels_map;
+    // Compare the two arrays subset and gripper mask and check whether they match or not
+    // returns the graspability score, which is an indicator for the suitability for grasping at this point
+    float graspability = vox_evaluate(number_of_matching_voxels, subset_of_voxel_array, gripper_mask);
+
+    // Fill in the point into the output data set
+    searching_solid_voxels_map[0][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.x[index_of_voxel_being_compared] + half_size_of_gripper_mask[0];
+    searching_solid_voxels_map[1][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.y[index_of_voxel_being_compared] + half_size_of_gripper_mask[1];
+    searching_solid_voxels_map[2][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.z[index_of_voxel_being_compared];      
+    // The forth column of the output data set is the graspability score. It is reduced by a penalty ratio
+    // if the number of solid terrain voxels inside the subset is below a thershold (Threshold of Solid Voxels, TSV)
+    if (number_of_matching_voxels > matching_settings.threshold) {
+      //std::cout <<"number of matching voxels exceeded the threshold" << std::endl;
+      searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
+    }
+    // We only penalize those points which has a erroneous high graspability score
+    else if (number_of_matching_voxels <= matching_settings.threshold && graspability >= 60) {
+      searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability - (((matching_settings.threshold - number_of_matching_voxels)*1.0)/(matching_settings.threshold*1.0))*100;
+      //std::cout << "Below threshold! Graspability: " << searching_solid_voxels_map[3][index_of_voxel_being_compared] <<std::endl;
+    }
+    else {
+      searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
+    }
+  }  
+  // End of the great loop
+  std::vector<std::vector<int>> voxel_coordinates_of_graspable_points;
+  // Crop the remaining 0 column
+  searching_solid_voxels_map.erase(std::remove_if(searching_solid_voxels_map.begin(), searching_solid_voxels_map.end(),
+                                  [](const std::vector<int>& matching) { return std::all_of(matching.begin(), matching.end(), [](int value) { return value == 0; }); }),
+                                  searching_solid_voxels_map.end());
+  //Correct the position of the voxel array of the terrain matrix
+  //because we make the voxel array in the reverse direction in pcd_voxelize.m
+  int max_z_position = z_max;
+  
+  for (auto& matching : searching_solid_voxels_map) 
+  {
+    matching[2] = -matching[2] + max_z_position;
+  }
+  voxel_coordinates_of_graspable_points = searching_solid_voxels_map;
   return voxel_coordinates_of_graspable_points;
 }
 
@@ -1165,7 +1159,6 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vec
   cloud_msg.header.stamp = this->now();
   return cloud_msg;
 }
-
 
 // ****** VISUALIZATION (INTERSECTION CONVEXITY & GRASPABILITY) ******* //
 

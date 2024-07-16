@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
         // ****** HubRobo Maps (small maps, set voxel size to 0.001!) ******* //
 
-        pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/realsense_octree.pcd",cloud);
+        pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/leaning_bouldering_holds.pcd",cloud);
 
 
         // ****** Cloud of curvatures ******* //
