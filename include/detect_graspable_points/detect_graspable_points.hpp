@@ -278,6 +278,7 @@ private:
 	std::vector<float> getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud);
 
 private:
+	std::string camera_frame;
   	// Node Handle declaration
 	
 //Subcriber

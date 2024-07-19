@@ -126,6 +126,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
   std::cout << "start processing" << std::endl;
   auto start_overall = std::chrono::high_resolution_clock::now();
   pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
+  camera_frame = received_cloud_msg.header.frame_id; //get the input cloud frame id for later process
 
   // ****** Downsampling ******* //
   downsampling(received_cloud_msg, "downsampling_frame", downsampled_cloud, matching_settings.voxel_size);
@@ -166,10 +167,10 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     relative_pose_between_camera_and_regression_plane.orientation.w = relative_quat_between_camera_and_regression_plane.normalized().w();
 
     // set a frame between a camera and the regression_plane calculated by pcd_transform()
-    tf_broadcast_from_pose("camera_depth_optical_frame", "regression_plane_frame", relative_pose_between_camera_and_regression_plane);
+    tf_broadcast_from_pose(received_cloud_msg.header.frame_id, "regression_plane_frame", relative_pose_between_camera_and_regression_plane);
 
     // publish the 3D centroid point for debug
-    visualizePoint(centroid_point[0], centroid_point[1], centroid_point[2], "centroid_point", "camera_depth_optical_frame");
+    visualizePoint(centroid_point[0], centroid_point[1], centroid_point[2], "centroid_point", received_cloud_msg.header.frame_id);
 
     // finish the description related to pcd_transform().
 
@@ -275,12 +276,11 @@ std::vector<float> detect_graspable_points::getMinValues(const pcl::PointCloud<p
 
 void detect_graspable_points::tf_broadcast(const std::string frame_id)
 {
-  static tf2_ros::TransformBroadcaster br=tf2_ros::TransformBroadcaster(this);
   geometry_msgs::msg::TransformStamped transformStamped;
   transformStamped.header.stamp = this->now();
-  transformStamped.header.frame_id = "camera_depth_optical_frame";
+  transformStamped.header.frame_id = camera_frame;
   transformStamped.child_frame_id = frame_id;
-  transformStamped.transform.translation.x = 2.0;
+  transformStamped.transform.translation.x = 0.0;
   transformStamped.transform.translation.y = 0.0;
   transformStamped.transform.translation.z = 0.0;
   tf2::Quaternion q;
@@ -289,7 +289,7 @@ void detect_graspable_points::tf_broadcast(const std::string frame_id)
   transformStamped.transform.rotation.y = q.y();
   transformStamped.transform.rotation.z = q.z();
   transformStamped.transform.rotation.w = q.w();
-  br.sendTransform(transformStamped);
+  dynamic_tf.sendTransform(transformStamped);
 }
 
 void detect_graspable_points::tf_broadcast_from_pose(const std::string parant_frame_id, const std::string child_frame_id_to, geometry_msgs::msg::Pose relative_pose_between_frame)
@@ -461,9 +461,8 @@ void detect_graspable_points::downsampling(const sensor_msgs::msg::PointCloud2 &
     }
   }
   // publish TF for visualization
-  const std::string downsampling_frame_ID = "downsampling_frame";
   // to shift positions of rendering point clouds
-  tf_broadcast(downsampling_frame_ID);
+  tf_broadcast(frame_id);
 }
 
 // ****** REGRESSION PLANE ******* //
@@ -519,7 +518,7 @@ void detect_graspable_points::pcd_least_squares_plane(const pcl::PointCloud<pcl:
   centroid_vector_of_plane3f[1]= centroid[1];
   centroid_vector_of_plane3f[2]= centroid[2]; 
 
-  visualizeVector(normal_vector_of_plane, centroid_vector_of_plane3f, "normal_vector", "camera_depth_optical_frame");
+  visualizeVector(normal_vector_of_plane, centroid_vector_of_plane3f, "normal_vector", camera_frame);
 }
 
 // ****** TRANSFORMATION ******* //

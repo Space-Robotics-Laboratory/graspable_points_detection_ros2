@@ -65,14 +65,14 @@ int main(int argc, char **argv)
         pcl::toROSMsg(cloud, output1);
 
         // Set the header information
-        output1.header.frame_id = "regression_plane_frame";
+        output1.header.frame_id = "camera_depth_optical_frame";
         output1.header.stamp = publish_pcl_node.now();
 
 
         // Publish the point cloud
         pub1->publish(output1);
 
-        cout <<"PointCloud published under the frame'camera_depth_optical_frame'" << endl;
+        cout <<"PointCloud published under the frame :"<<output1.header.frame_id << endl;
 
         // Sleep to maintain the 1 Hz publishing rate
         loop_rate.sleep();
