@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#define DEBUG_MODE false
+
 
 /*! ******************************
  ***       Constructor       *****
@@ -123,7 +125,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
 
   // ************************** //
-  std::cout << "start processing" << std::endl;
+  std::cout <<"************************ START ************************" << std::endl;
   auto start_overall = std::chrono::high_resolution_clock::now();
   pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
   camera_frame = received_cloud_msg.header.frame_id; //get the input cloud frame id for later process
@@ -143,11 +145,15 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     Eigen::Vector3f normal_vector;
     Eigen::Matrix3f rotation_matrix;
     pcl::PointCloud<pcl::PointXYZ> transformed_pcl;
-    auto start_transform = std::chrono::high_resolution_clock::now();
+    #if DEBUG_MOD
+    auto start_transform = std::chrono::high_resolution_clock::now();*
+    #endif
     pcd_transform(downsampled_cloud,transformed_pcl,centroid_point,rotation_matrix);  // /!\ modified downsampled_points to real cloud data 
+    #if DEBUG_MOD
     auto stop_transform = std::chrono::high_resolution_clock::now();
     auto duration_transform = std::chrono::duration_cast<std::chrono::microseconds>(stop_transform - start_transform);
     std::cout <<"Time for pcd_transform in µs : " << duration_transform.count() << std::endl;
+    #endif
 
 
     // ****** Testing and Debug of Transformation ******* //
@@ -169,9 +175,10 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // set a frame between a camera and the regression_plane calculated by pcd_transform()
     tf_broadcast_from_pose(received_cloud_msg.header.frame_id, "regression_plane_frame", relative_pose_between_camera_and_regression_plane);
 
+    #if DEBUG_MODE
     // publish the 3D centroid point for debug
     visualizePoint(centroid_point[0], centroid_point[1], centroid_point[2], "centroid_point", received_cloud_msg.header.frame_id);
-
+    #endif
     // finish the description related to pcd_transform().
 
     std::vector<std::vector<std::vector<int>>> voxel_matrix;  // important that size needs to be 0 in declaration for the resize to work properly
@@ -182,8 +189,11 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
     // ****** Interpolate ******* //
     pcl::PointCloud<pcl::PointXYZ> interpolated_pcl;
+    #if DEBUG_MOD
     auto start_interp = std::chrono::high_resolution_clock::now();
-    pcd_interpolate(transformed_pcl,interpolated_pcl);   
+    #endif
+    pcd_interpolate(transformed_pcl,interpolated_pcl);
+    #if DEBUG_MOD   
     auto stop_interp = std::chrono::high_resolution_clock::now();
     auto duration_interp = std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
     std::cout <<"Time for pcd_interpolate in µs : " << duration_interp.count() << std::endl;
@@ -194,17 +204,29 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     interpolated_point_cloud_for_pub.header.frame_id="regression_plane_frame";
     interpolated_point_cloud_for_pub.header.stamp = this->now();
     interpolate_point_pub_->publish(interpolated_point_cloud_for_pub);
+    #endif
 
-    // ****** Find the peaks ******* //        
+    // ****** Find the peaks ******* //
+    #if DEBUG_MOD
+    auto start_peaks= std::chrono::high_resolution_clock::now();
+    #endif      
     detectTerrainPeaks(interpolated_pcl, peak_cloud,peak_coordinates, matching_settings);
-
+    #if DEBUG_MOD   
+    auto stop_peaks = std::chrono::high_resolution_clock::now();
+    auto duration_peaks = std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
+    std::cout <<"Time for detectTerrainPeaks in µs : " << duration_peaks.count() << std::endl;
+    #endif
 
     // ****** Voxelize ******* //
+    #if DEBUG_MOD
     auto start_voxel = std::chrono::high_resolution_clock::now();
+    #endif
     voxel_matrix = pcd_voxelize(interpolated_pcl, matching_settings.voxel_size);
+    #if DEBUG_MOD
     auto stop_voxel = std::chrono::high_resolution_clock::now();
     auto duration_voxel = std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
     std::cout <<"Time for pcd_voxelize in µs : " << duration_voxel.count() << std::endl;
+    #endif
 
     //get minimum values for re-transform later
     offset_vector_for_retransform = getMinValues(interpolated_pcl);
@@ -216,12 +238,16 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // ****** Voxel matching ******* //
     // create an empty 2d array ready to use. it will be 4 columns: x, y, z and graspability score
     std::vector<std::vector<int>> graspable_points(0, std::vector<int>(0,0));
+    #if DEBUG_MOD
     auto start_matching = std::chrono::high_resolution_clock::now();
+    #endif
     graspable_points = voxel_matching(voxel_matrix, gripper_mask, matching_settings);
+    #if DEBUG_MOD
     std::cout<<"Size of graspable after voxel_matching"<<graspable_points[0].size() <<std::endl;
     auto stop_matching = std::chrono::high_resolution_clock::now();
     auto duration_matching = std::chrono::duration_cast<std::chrono::microseconds>(stop_matching - start_matching);
     std::cout <<"Time for voxel_matching in µs : " << duration_matching.count() << std::endl;
+    #endif
 
     // ****** Re-transform ******* //
 
@@ -235,7 +261,6 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // Turn the graspabiliy score to color gradient. Publish the pointcloud with respect to regression_plane_frame
     sensor_msgs::msg::PointCloud2 marker_of_graspable_points;
     marker_of_graspable_points = visualizeRainbow(graspable_points_after_retransform, matching_settings);
-    std::cout <<"Output cloud with graspability color gradient created"<< std::endl;
     graspability_map_pub_->publish(marker_of_graspable_points);
 
     // ****** Curvature Combined (Criterion II) ******* //
@@ -249,7 +274,8 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // ****** Overall time consumption ******* //
     auto stop_overall = std::chrono::high_resolution_clock::now();
     auto duration_overall = std::chrono::duration_cast<std::chrono::microseconds>(stop_overall - start_overall);
-    std::cout <<"Total time in µs : " << duration_overall.count() << std::endl;
+    std::cout <<"Total time in ms : " << duration_overall.count()/1000 << std::endl;
+    std::cout <<"************************  END  ************************" << std::endl;
   }
 }
 
@@ -331,7 +357,9 @@ void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector
     }
   }
   outFile.close();
+  #if DEBUG_MODE
   std::cout << "3D std::vector saved to file: " << filename << std::endl;
+  #endif
 }
 
 void detect_graspable_points::visualizePoint(const double x, const double y, const double z, const std::string object_name, const std::string frame_id)
@@ -679,12 +707,9 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
     auto start = std::chrono::high_resolution_clock::now();
     voxelized_pcd.resize(xmatrix_size, std::vector<std::vector<int>>(ymatrix_size, std::vector<int>(zmatrix_size,0))); 
     auto end = std::chrono::high_resolution_clock::now();
-    // 経過時間を計算（ミリ秒）
-    std::chrono::duration<double, std::milli> elapsed = end - start;
-    // 結果を表示
+
   int voxel_index_x,voxel_index_y,voxel_index_z;
 
-    start = std::chrono::high_resolution_clock::now();
   for (int i=0; i < pcl_after_filtering.size(); i++)
   {
     // offset the point by the minimum coordinate so minimum is now 0 then divide by resolution to know in which voxel the point is. 
@@ -695,11 +720,6 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
     voxel_index_z= trunc((point.z-min_z)/cube_size + cube_size/4);
     voxelized_pcd[voxel_index_x][voxel_index_y][voxel_index_z]=1;
   }
-  end = std::chrono::high_resolution_clock::now();
-  // 経過時間を計算（ミリ秒）
-  elapsed = end - start;
-  // 結果を表示
-  std::cout << "*#  3 for; \n#* Time passed: " << elapsed.count() << " ms" << std::endl;
   return voxelized_pcd;
 }
 
@@ -937,14 +957,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 {
   // ****** preparations ******* //
   // Copy inputted terrain data
-  auto start = std::chrono::high_resolution_clock::now();
   std::vector<std::vector<std::vector<int>>> searching_voxel_array = terrain_matrix;
-  auto end = std::chrono::high_resolution_clock::now();
-
-  // 経過時間を計算（ミリ秒）
-  std::chrono::duration<double, std::milli> elapsed = end - start;
-  // 結果を表示
-  std::cout << "************"<< elapsed.count() << " ミリ秒" << std::endl;
 
   // size_of_voxel_array is a 3 element std::vector filled with the sizes of terrain_matrix
   std::vector<int> size_of_voxel_array = {static_cast<int>(terrain_matrix.size()), static_cast<int>(terrain_matrix[0].size()), static_cast<int>(terrain_matrix[0][0].size())};
@@ -1001,7 +1014,9 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 
   // Prepare for loop
   std::vector<std::vector<int>> searching_solid_voxels_map(4, std::vector<int>(number_of_solid_voxels_in_searching_voxel_array));
+  #if  DEBUG_MODE
   std::cout <<"Size of number_of_solid_voxels_in_searching_voxel_array:"<< number_of_solid_voxels_in_searching_voxel_array << std::endl;
+  #endif
     
   // Great loop
   for (int index_of_voxel_being_compared = 0; index_of_voxel_being_compared < number_of_solid_voxels_in_searching_voxel_array; ++index_of_voxel_being_compared) 
@@ -1033,13 +1048,11 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
     // The forth column of the output data set is the graspability score. It is reduced by a penalty ratio
     // if the number of solid terrain voxels inside the subset is below a thershold (Threshold of Solid Voxels, TSV)
     if (number_of_matching_voxels > matching_settings.threshold) {
-      //std::cout <<"number of matching voxels exceeded the threshold" << std::endl;
       searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
     }
     // We only penalize those points which has a erroneous high graspability score
     else if (number_of_matching_voxels <= matching_settings.threshold && graspability >= 60) {
       searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability - (((matching_settings.threshold - number_of_matching_voxels)*1.0)/(matching_settings.threshold*1.0))*100;
-      //std::cout << "Below threshold! Graspability: " << searching_solid_voxels_map[3][index_of_voxel_being_compared] <<std::endl;
     }
     else {
       searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
@@ -1202,7 +1215,9 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::combinedAnalysis(const st
     }
   }
   // Publish to ROS
+  #if DEBUG_MODE
   std::cout << "published " << close_points.size () << " data points to ROS" << std::endl;
+  #endif
   pcl::toROSMsg(close_points, cloud_msg);
   cloud_msg.header.frame_id="regression_plane_frame";
   cloud_msg.header.stamp = this->now();
