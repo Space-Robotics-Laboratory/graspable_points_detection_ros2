@@ -19,8 +19,7 @@ int main(int argc, char **argv)
     rclcpp::Node publish_pcl_node =rclcpp::Node("publish_pcl_node");
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub1 = publish_pcl_node.create_publisher<sensor_msgs::msg::PointCloud2> ("merged_pcd", 1);
 
-    while (rclcpp::ok())
-    {   
+
 
         // Create a point cloud
         pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -52,8 +51,8 @@ int main(int argc, char **argv)
         //pcl::io::loadPCDFile<pcl::PointXYZ>("src/SRL_GraspableTargetDetection/detect_graspable_points/pcd_data/scanned_cloud_realtime.pcd",cloud);
 
         // ****** HubRobo Maps (small maps, set voxel size to 0.001!) ******* //
-
-        pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/leaning_bouldering_holds.pcd",cloud);
+        std::string name ="limbero_testfield_quarted.pcd"; 
+        pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/"+name,cloud);
 
 
         // ****** Cloud of curvatures ******* //
@@ -72,11 +71,10 @@ int main(int argc, char **argv)
         // Publish the point cloud
         pub1->publish(output1);
 
-        cout <<"PointCloud published under the frame :"<<output1.header.frame_id << endl;
+        cout <<name<<" published under the frame :"<<output1.header.frame_id << endl;
 
         // Sleep to maintain the 1 Hz publishing rate
-        loop_rate.sleep();
-    }
+
 
 
     return 0;

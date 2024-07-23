@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#define DEBUG_MODE false
+#define DEBUG_MOD true
 
 
 /*! ******************************
@@ -76,7 +76,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
 
   // ****** HubRobo Gripper ******* //
-
+/*
     GripperParam gripper_param = { //in [mm]!
     32, // palm_diameter
     28, // palm_diameter_of_finger_joints
@@ -91,10 +91,10 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     4, // margin_of_top_solid_diameter
     2, // inside_margin_of_bottom_void_diameter
   };
-
+*/
 
   // ****** LIMBERO ******* //
-/*
+
   GripperParam gripper_param = { //in [mm]!
 		62, // palm_diameter
 		69, // palm_diameter_of_finger_joints
@@ -109,16 +109,16 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 		4, // margin_of_top_solid_diameter
 		2, // inside_margin_of_bottom_void_diameter
 	};
-*/
+
 
   // ****** General Parameters ******* //
 
   MatchingSettings matching_settings ={
     0.002, // voxel size [m]
-    120, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
+    100, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
     "on", // delete the targets whose z positions are lower than a limit value: on or off
-    0.01, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
-    0.03, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
+    0.015, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
+    0.07, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
     3, // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
     90 // Graspability threshold. Above which we can call it graspable with great certainty
   };
@@ -146,7 +146,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     Eigen::Matrix3f rotation_matrix;
     pcl::PointCloud<pcl::PointXYZ> transformed_pcl;
     #if DEBUG_MOD
-    auto start_transform = std::chrono::high_resolution_clock::now();*
+    auto start_transform = std::chrono::high_resolution_clock::now();
     #endif
     pcd_transform(downsampled_cloud,transformed_pcl,centroid_point,rotation_matrix);  // /!\ modified downsampled_points to real cloud data 
     #if DEBUG_MOD
@@ -175,7 +175,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // set a frame between a camera and the regression_plane calculated by pcd_transform()
     tf_broadcast_from_pose(received_cloud_msg.header.frame_id, "regression_plane_frame", relative_pose_between_camera_and_regression_plane);
 
-    #if DEBUG_MODE
+    #if DEBUG_MOD
     // publish the 3D centroid point for debug
     visualizePoint(centroid_point[0], centroid_point[1], centroid_point[2], "centroid_point", received_cloud_msg.header.frame_id);
     #endif
@@ -234,6 +234,9 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // ****** Gripper mask ******* //
     std::vector<std::vector<std::vector<int>>> gripper_mask(0, std::vector<std::vector<int>>(0, std::vector<int>(0,0)));
     gripper_mask = creategrippermask(gripper_param, matching_settings.voxel_size);
+    #if DEBUG_MOD
+    std::cout<<"Mask created!"<<std::endl;
+    #endif
 
     // ****** Voxel matching ******* //
     // create an empty 2d array ready to use. it will be 4 columns: x, y, z and graspability score
@@ -357,7 +360,7 @@ void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector
     }
   }
   outFile.close();
-  #if DEBUG_MODE
+  #if DEBUG_MOD
   std::cout << "3D std::vector saved to file: " << filename << std::endl;
   #endif
 }
@@ -1014,7 +1017,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 
   // Prepare for loop
   std::vector<std::vector<int>> searching_solid_voxels_map(4, std::vector<int>(number_of_solid_voxels_in_searching_voxel_array));
-  #if  DEBUG_MODE
+  #if  DEBUG_MOD
   std::cout <<"Size of number_of_solid_voxels_in_searching_voxel_array:"<< number_of_solid_voxels_in_searching_voxel_array << std::endl;
   #endif
     
@@ -1215,7 +1218,7 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::combinedAnalysis(const st
     }
   }
   // Publish to ROS
-  #if DEBUG_MODE
+  #if DEBUG_MOD
   std::cout << "published " << close_points.size () << " data points to ROS" << std::endl;
   #endif
   pcl::toROSMsg(close_points, cloud_msg);
