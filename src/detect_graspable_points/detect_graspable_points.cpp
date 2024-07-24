@@ -114,7 +114,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
   // ****** General Parameters ******* //
 
   MatchingSettings matching_settings ={
-    0.002, // voxel size [m]
+    0.004, // voxel size [m]
     100, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
     "on", // delete the targets whose z positions are lower than a limit value: on or off
     0.015, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
