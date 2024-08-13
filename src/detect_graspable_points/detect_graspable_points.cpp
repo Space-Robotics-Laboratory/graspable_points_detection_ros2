@@ -14,6 +14,7 @@
 #include <stdio.h>
 
 #define DEBUG_MOD true
+#define MY_PRINT(x) std::cout<<#x<< "=" << x <<std::endl
 
 
 /*! ******************************
@@ -38,6 +39,9 @@ detect_graspable_points::detect_graspable_points()
   transformed_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/transformed_point", 1);
   point_visualization_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/point_visualization_marker", 1);
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/normal_vector", 1);
+
+  //static broadcaster for now since the computation is quite long and the message are comming one by one not by a constant stream thus leading to sometime messge here for too long and crashing nodes
+  tf_static_broadcast_= std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
 }
 
 
@@ -57,7 +61,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
   // ****** PARAMETERS ******* //
 
   // ****** SCAR-E Gripper ******* //
-/* 
+/*
   GripperParam gripper_param = { //in [mm]!
 		71, // palm_diameter
 		92, // palm_diameter_of_finger_joints
@@ -71,12 +75,12 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 		90, // closing_height, Vertical distance between the tip of the spine and the bottom of the palm when closed
 		4, // margin_of_top_solid_diameter
 		2, // inside_margin_of_bottom_void_diameter
-	}; */
-
+	}; 
+*/
 
 
   // ****** HubRobo Gripper ******* //
-/*
+
     GripperParam gripper_param = { //in [mm]!
     32, // palm_diameter
     28, // palm_diameter_of_finger_joints
@@ -91,10 +95,10 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     4, // margin_of_top_solid_diameter
     2, // inside_margin_of_bottom_void_diameter
   };
-*/
+
 
   // ****** LIMBERO ******* //
-
+/*
   GripperParam gripper_param = { //in [mm]!
 		62, // palm_diameter
 		69, // palm_diameter_of_finger_joints
@@ -109,15 +113,15 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 		4, // margin_of_top_solid_diameter
 		2, // inside_margin_of_bottom_void_diameter
 	};
-
+*/
 
   // ****** General Parameters ******* //
 
   MatchingSettings matching_settings ={
-    0.004, // voxel size [m]
-    100, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
+    0.002, // voxel size [m]
+    300, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
     "on", // delete the targets whose z positions are lower than a limit value: on or off
-    0.015, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
+    0.03, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
     0.07, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
     3, // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
     90 // Graspability threshold. Above which we can call it graspable with great certainty
@@ -318,7 +322,7 @@ void detect_graspable_points::tf_broadcast(const std::string frame_id)
   transformStamped.transform.rotation.y = q.y();
   transformStamped.transform.rotation.z = q.z();
   transformStamped.transform.rotation.w = q.w();
-  dynamic_tf.sendTransform(transformStamped);
+  tf_static_broadcast_->sendTransform(transformStamped);
 }
 
 void detect_graspable_points::tf_broadcast_from_pose(const std::string parant_frame_id, const std::string child_frame_id_to, geometry_msgs::msg::Pose relative_pose_between_frame)
@@ -335,7 +339,7 @@ void detect_graspable_points::tf_broadcast_from_pose(const std::string parant_fr
   transformStamped.transform.rotation.y = relative_pose_between_frame.orientation.y;
   transformStamped.transform.rotation.z = relative_pose_between_frame.orientation.z;
   transformStamped.transform.rotation.w = relative_pose_between_frame.orientation.w;
-  dynamic_tf.sendTransform(transformStamped);
+  tf_static_broadcast_->sendTransform(transformStamped);
 }
 
 void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector3D, const std::string& filename) 
@@ -849,6 +853,31 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::creategrippe
   float grippable_radius = 0;
   float unreachble_radius = 0;
   float distance_from_center_of_layer = 0;
+
+  //out
+  std::cout<<"*****VALUES*****"<<std::endl;
+  MY_PRINT(ratio);
+  MY_PRINT(palm_diameter);
+  MY_PRINT(palm_diameter_of_finger_joints);
+  MY_PRINT(finger_length);
+  MY_PRINT(spine_length);
+  MY_PRINT(spine_depth);
+  MY_PRINT(opening_spine_radius);
+  MY_PRINT(opening_spine_depth);
+  MY_PRINT(closing_height);
+  MY_PRINT(margin_of_top_solid_diameter);
+  MY_PRINT(inside_margin_of_bottom_void_diameter);
+  MY_PRINT(gripper_mask_half_size);
+  MY_PRINT(gripper_mask_size);
+  MY_PRINT(gripper_mask_height);
+  MY_PRINT(gripper_mask_top_solid_radius);
+  MY_PRINT(gripper_mask_clearance);
+  MY_PRINT(gripper_mask_bottom_void_radius);
+  std::cout<<"*****VALUES*****"<<std::endl;
+
+  int x= 10;
+  int y= 10;
+  std::ofstream outFile("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/Values.txt");
 
   // Make the gripper_mask by setting the elements of 1
   if (opening_spine_depth ==1){opening_spine_depth =2;} //if the spinde depth is one then there is a division by 0

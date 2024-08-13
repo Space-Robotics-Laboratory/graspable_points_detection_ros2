@@ -22,6 +22,7 @@
 #include <geometry_msgs/msg/pose.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include "Eigen/Core"
 #include "Eigen/Dense"
 #include <eigen3/Eigen/Eigenvalues>
@@ -294,6 +295,8 @@ private:
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr point_visualization_marker_pub_ ;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_ ;
 	tf2_ros::TransformBroadcaster dynamic_tf=tf2_ros::TransformBroadcaster(this);
+
+	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcast_;
 };
 
 
