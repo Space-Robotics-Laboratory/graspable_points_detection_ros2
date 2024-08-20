@@ -60,15 +60,10 @@ detect_graspable_points::detect_graspable_points()
   std::cout<<"###-----FINISHED INITIALIZATION-----###"<<std::endl;
 }
 
-
-
 /*! ******************************
  ***        Destructor       *****
  *********************************/
-detect_graspable_points::~detect_graspable_points()
-{
-
-}
+detect_graspable_points::~detect_graspable_points(){}
 
 //******** CALLBACK *******//
 
@@ -77,18 +72,6 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
   #if DEBUG_MOD
   debugging_pub_->publish(received_cloud_msg);
   #endif
-
-  // ****** General Parameters ******* //
-
-  MatchingSettings matching_settings ={
-    VOXEL_SIZE, // voxel size [m]
-    150, // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
-    "on", // delete the targets whose z positions are lower than a limit value: on or off
-    0.015, // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
-    0.07, // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
-    3, // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
-    90 // Graspability threshold. Above which we can call it graspable with great certainty
-  };
 
   #if (TEST_MOD)
   std::vector<int> x = {0,1,7,1,3,4,4,3,4,9};
@@ -130,7 +113,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
   // ****** Downsampling ******* //
   pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
-  downsampling(received_cloud_msg, "downsampling_frame", downsampled_cloud, matching_settings.voxel_size);
+  downsampling(received_cloud_msg, "downsampling_frame", downsampled_cloud);
 
   // ****** remove all the NaNs from pcd ******* //
   std::vector<int> indices;
@@ -156,7 +139,6 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     auto duration_transform = std::chrono::duration_cast<std::chrono::microseconds>(stop_transform - start_transform);
     std::cout <<"Time for pcd_transform in µs : " << duration_transform.count() << std::endl;
     #endif
-
 
     // ****** Testing and Debug of Transformation ******* //
 
@@ -185,8 +167,6 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
 
     std::vector<std::vector<std::vector<int>>> voxel_matrix;  // important that size needs to be 0 in declaration for the resize to work properly
     std::vector<float> offset_vector_for_retransform;
-    pcl::PointCloud<pcl::PointXYZRGB> peak_cloud;
-    sensor_msgs::msg::PointCloud2 peak_coordinates;
 
 
     // ****** Interpolate ******* //
@@ -210,22 +190,11 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     interpolate_point_pub_->publish(interpolated_point_cloud_for_pub);
     #endif
 
-    // ****** Find the peaks ******* //
-    #if DEBUG_MOD
-    auto start_peaks= std::chrono::high_resolution_clock::now();
-    #endif      
-    detectTerrainPeaks(interpolated_pcl, peak_cloud,peak_coordinates, matching_settings);
-    #if DEBUG_MOD   
-    auto stop_peaks = std::chrono::high_resolution_clock::now();
-    auto duration_peaks = std::chrono::duration_cast<std::chrono::microseconds>(stop_peaks - start_peaks);
-    std::cout <<"Time for detectTerrainPeaks in µs : " << duration_peaks.count() << std::endl;
-    #endif
-
     // ****** Voxelize ******* //
     #if DEBUG_MOD
     auto start_voxel = std::chrono::high_resolution_clock::now();
     #endif
-    voxel_matrix = pcd_voxelize(interpolated_pcl, matching_settings.voxel_size);
+    voxel_matrix = pcd_voxelize(interpolated_pcl);
     #if DEBUG_MOD
     auto stop_voxel = std::chrono::high_resolution_clock::now();
     auto duration_voxel = std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
@@ -242,7 +211,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     #if DEBUG_MOD
     auto start_matching = std::chrono::high_resolution_clock::now();
     #endif
-    graspable_points = voxel_matching(voxel_matrix, matching_settings);
+    graspable_points = voxel_matching(voxel_matrix);
     #if DEBUG_MOD
     std::cout<<"Size of graspable after voxel_matching"<<graspable_points[0].size() <<std::endl;
     auto stop_matching = std::chrono::high_resolution_clock::now();
@@ -255,22 +224,20 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     std::vector<std::vector<float>> graspable_points_after_retransform;
     // NOTE: Re-transform only to the regression plane frame, NOT to robot-based frame, for better visualization
     // If you want to further retransform to input camera depth optical frame, you have to modify the function
-    graspable_points_after_retransform = pcd_re_transform(graspable_points, matching_settings.voxel_size, offset_vector_for_retransform);
+    graspable_points_after_retransform = pcd_re_transform(graspable_points, offset_vector_for_retransform);
 
     // ****** Visualization ******* //
     // ****** Color Gradient (Criterion I) ******* //
     // Turn the graspabiliy score to color gradient. Publish the pointcloud with respect to regression_plane_frame
     sensor_msgs::msg::PointCloud2 marker_of_graspable_points;
-    marker_of_graspable_points = visualizeRainbow(graspable_points_after_retransform, matching_settings);
+    marker_of_graspable_points = visualizeRainbow(graspable_points_after_retransform);
     graspability_map_pub_->publish(marker_of_graspable_points);
 
     // ****** Curvature Combined (Criterion II) ******* //
-    sensor_msgs::msg::PointCloud2 results_of_combined_analysis;
-    // Searching distance for intersection between convex peaks and graspability maxima
-    float distance_threshold = matching_settings.voxel_size;
-    // combine Graspability maxima with convex shape analysis. output the intersection of both.
-    results_of_combined_analysis = combinedAnalysis(graspable_points_after_retransform, peak_cloud, distance_threshold, matching_settings);
-    combined_pub_->publish(results_of_combined_analysis);
+    sensor_msgs::msg::PointCloud2 msg_evaluated_points;
+    //transforms the vector into a msg format only keeping point above threshold graspability that can be sent 
+    msg_evaluated_points = to_msg_format(graspable_points_after_retransform);
+    combined_pub_->publish(msg_evaluated_points);
 
     // ****** Clusterizing ******* //
     #if DEBUG_MOD
@@ -279,10 +246,10 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     pcl::PointCloud<pcl::PointXYZ> analysis_pcl;
     pcl::PointCloud<pcl::PointXYZ> clusters_centroid;
     sensor_msgs::msg::PointCloud2 msg_clusters_centroid;;
-    pcl::fromROSMsg(results_of_combined_analysis,analysis_pcl);
+    pcl::fromROSMsg(msg_evaluated_points,analysis_pcl);
     clusters_centroid = clusterize(analysis_pcl);
     pcl::toROSMsg(clusters_centroid,msg_clusters_centroid);
-    msg_clusters_centroid.header.frame_id = results_of_combined_analysis.header.frame_id;
+    msg_clusters_centroid.header.frame_id = msg_evaluated_points.header.frame_id;
     msg_clusters_centroid.header.stamp= this->now();
     #if DEBUG_MOD
     auto stop_cluster = std::chrono::high_resolution_clock::now();
@@ -465,7 +432,7 @@ std::vector<int> subtractInteger(const std::vector<int>& vector, int num)
 
 // ****** DOWNSAMPLING ******* //
 
-void detect_graspable_points::downsampling(const sensor_msgs::msg::PointCloud2 & cloud_msg, const std::string frame_id, pcl::PointCloud<pcl::PointXYZ> &filtered_points, const float cube_size)
+void detect_graspable_points::downsampling(const sensor_msgs::msg::PointCloud2 & cloud_msg, const std::string frame_id, pcl::PointCloud<pcl::PointXYZ> &filtered_points)
 {
   // VoxelGrid filtering
   // Ref: http://www.pointclouds.org/documentation/tutorials/voxel_grid.php#voxelgrid
@@ -479,7 +446,7 @@ void detect_graspable_points::downsampling(const sensor_msgs::msg::PointCloud2 &
   // Perform the actual filtering
   pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
   sor.setInputCloud (cloud);
-  sor.setLeafSize (cube_size, cube_size, cube_size);
+  sor.setLeafSize (VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE);
   sor.filter (*cloud_filtered);
 
   // Convert to ROS data type
@@ -680,7 +647,7 @@ void detect_graspable_points::pcd_interpolate (const pcl::PointCloud<pcl::PointX
 }
 
 // ****** VOXELIZATION ******* //
-std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize (const pcl::PointCloud<pcl::PointXYZ>  input_pcd, const float cube_size){
+std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize(const pcl::PointCloud<pcl::PointXYZ>  input_pcd){
   
   //voxel grid creates voxels of said size and then only keeps the centroid of voxels that have points in them
   pcl::VoxelGrid<pcl::PCLPointCloud2> voxel_grid;
@@ -707,9 +674,9 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
 
   //size of the matrix is based on the range of data and how many cubes can fit inside
   //ex : from 0 to 9 you can fit 3 cube of size 3
-  xmatrix_size= trunc((max_x-min_x)/cube_size)+1;
-  ymatrix_size= trunc((max_y-min_y)/cube_size)+1;
-  zmatrix_size= trunc((max_z-min_z)/cube_size)+1;
+  xmatrix_size= trunc((max_x-min_x)/VOXEL_SIZE)+1;
+  ymatrix_size= trunc((max_y-min_y)/VOXEL_SIZE)+1;
+  zmatrix_size= trunc((max_z-min_z)/VOXEL_SIZE)+1;
   // change data type for adding it to class
   pcl::PCLPointCloud2 point_cloud;
   pcl::PCLPointCloud2::Ptr point_cloud_2format (new pcl::PCLPointCloud2 ());
@@ -717,7 +684,7 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
   *point_cloud_2format=point_cloud;
 
   voxel_grid.setInputCloud(point_cloud_2format);
-  voxel_grid.setLeafSize(cube_size,cube_size,cube_size);
+  voxel_grid.setLeafSize(VOXEL_SIZE,VOXEL_SIZE,VOXEL_SIZE);
 
   // compute a filter to only keep centroid point of voxel
   pcl::PointCloud<pcl::PointXYZ> pcl_after_filtering;
@@ -732,9 +699,9 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
   {
     // offset the point by the minimum coordinate so minimum is now 0 then divide by resolution to know in which voxel the point is. 
     // trunc it to only keep integer part. refer to : /HubRobo/tools/detect_graspable_points/fig_for_understanding/step_of_voxelize.png
-    voxel_index_x= trunc((point.x-min_x)/cube_size + cube_size/4);
-    voxel_index_y= trunc((point.y-min_y)/cube_size + cube_size/4);
-    voxel_index_z= trunc((point.z-min_z)/cube_size + cube_size/4);
+    voxel_index_x= trunc((point.x-min_x)/VOXEL_SIZE + VOXEL_SIZE/4);
+    voxel_index_y= trunc((point.y-min_y)/VOXEL_SIZE + VOXEL_SIZE/4);
+    voxel_index_z= trunc((point.z-min_z)/VOXEL_SIZE + VOXEL_SIZE/4);
     voxelized_pcd[voxel_index_x][voxel_index_y][voxel_index_z]=1;
   }
   x.clear();
@@ -893,80 +860,9 @@ void detect_graspable_points::creategrippermask(int (&gripper_mask)[gripper_mask
   //save3DVectorToFile(gripper_mask, filename);
 }
 
-
-// ****** CURVATURE ANALYSIS ******* //
-
-void detect_graspable_points::detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> &peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
-                                                const MatchingSettings& matching_settings)
-  {
-  // This function carries out a convex peak detection using curvature analysis. First, we compute the surface normal vectors
-  // of each point in a defined radius "searching_radius_for_normal_and_curvature". Next, we compute the respective principal
-  // curvatures k1 and k2. Convex peaks are defined as points with an positive k1, k2 and k1*k2=K (Gaussian curvature).
-  
-  // Create a normal estimation object
-  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-  ne.setInputCloud(input_cloud.makeShared());
-
-  // Create a KD-Tree for searching
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-  ne.setSearchMethod(tree);
-
-  // Output datasets
-  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
-
-  // Compute normals
-  ne.setRadiusSearch(matching_settings.searching_radius_for_normal_and_curvature); // Adjust the radius as needed
-  ne.compute(*cloud_normals);
-
-  // Create a curvature estimation object
-  pcl::PrincipalCurvaturesEstimation<pcl::PointXYZ, pcl::Normal, pcl::PrincipalCurvatures> est;
-  est.setInputCloud(input_cloud.makeShared());
-  est.setInputNormals(cloud_normals);
-  est.setSearchMethod(tree);
-
-  // Output datasets
-  pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr cloud_curvatures(new pcl::PointCloud<pcl::PrincipalCurvatures> ());
-
-  // Compute curvature
-  est.setRadiusSearch(matching_settings.searching_radius_for_normal_and_curvature); // Adjust the radius as needed
-  est.compute(*cloud_curvatures);
-
-  // Detect peaks based on positive curvature values and color them blue
-  for (size_t i = 0; i < cloud_curvatures->size(); ++i) 
-  {
-    float curvature1 = cloud_curvatures->points[i].pc1; // Use the principal curvature 1
-    float curvature2 = cloud_curvatures->points[i].pc2; // Use the principal curvature 2
-    /* 
-    curvature1 and curvature2 indicate the maximum and minimum eigenvalues of the principal curvature.
-    (curvature1 * curvature2) is called Gaussian curvature and it is >0 if the surface is dome-shaped.
-    if it is <0, the surface is hyperbloid shaped. if =0, it is cylinder shaped.
-    the normal z value shows in the direction of the center of a curvature's radius, so in order to find
-    the convex shaped peaks and avoid concave areas, we require points whose normal z value is positive.
-    */
-    if ((curvature1 * curvature2) > 0.0005 
-        && curvature1 > 0
-        && curvature2 > 0 
-        && input_cloud.points[i].z > matching_settings.delete_lower_targets_threshold)
-    { // Positive curvature indicates a peak
-      pcl::PointXYZRGB blue_peak;
-      blue_peak.x = input_cloud.points[i].x;
-      blue_peak.y = input_cloud.points[i].y;
-      blue_peak.z = input_cloud.points[i].z;
-      blue_peak.r = 0; // Red component
-      blue_peak.g = 0; // Green component
-      blue_peak.b = 255; // Blue component
-      peak_visualization_cloud.push_back(blue_peak);
-    }
-  }
-  // Publish to ROS
-  pcl::toROSMsg(peak_visualization_cloud, cloud_msg);
-  cloud_msg.header.frame_id="regression_plane_frame";
-  cloud_msg.header.stamp = this->now();
-}
-
 // ****** VOXEL MATCHING ******* //
 
-std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix, const MatchingSettings& matching_settings)
+std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix)
 {
   // ****** preparations ******* //
   // Copy inputted terrain data
@@ -996,7 +892,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
   MY_PRINT(number_of_solid_after_voxelization);
 
   // Now, insert empty voxel layers in z-direction bottom, minus the auxiliary gripper mask layers
-  std::vector<int> placeholderZeros(size_of_gripper_mask[2]-matching_settings.extra_sheet, 0);
+  std::vector<int> placeholderZeros(size_of_gripper_mask[2]-EXTRA_SHEET, 0);
 
   for (int i = 0; i < size_of_voxel_array[0]; ++i) {
     for (int j = 0; j < size_of_voxel_array[1]; ++j) {
@@ -1062,12 +958,12 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
     searching_solid_voxels_map[2][index_of_voxel_being_compared] = subscripts_of_searching_solid_voxels.z[index_of_voxel_being_compared];      
     // The forth column of the output data set is the graspability score. It is reduced by a penalty ratio
     // if the number of solid terrain voxels inside the subset is below a thershold (Threshold of Solid Voxels, TSV)
-    if (number_of_matching_voxels > matching_settings.threshold) {
+    if (number_of_matching_voxels > THRESHOLD) {
       searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
     }
     // We only penalize those points which has a erroneous high graspability score
-    else if (number_of_matching_voxels <= matching_settings.threshold && graspability >= 60) {
-      searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability - (((matching_settings.threshold - number_of_matching_voxels)*1.0)/(matching_settings.threshold*1.0))*100;
+    else if (number_of_matching_voxels <= THRESHOLD && graspability >= 60) {
+      searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability - (((THRESHOLD - number_of_matching_voxels)*1.0)/(THRESHOLD*1.0))*100;
     }
     else {
       searching_solid_voxels_map[3][index_of_voxel_being_compared] = graspability;
@@ -1094,7 +990,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 
 // ****** RE-TRANSFORMATION ******* //
 
-std::vector<std::vector<float>> detect_graspable_points::pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, float voxel_size, std::vector<float> offset_vector) 
+std::vector<std::vector<float>> detect_graspable_points::pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, std::vector<float> offset_vector) 
 {
   //pcd_re_transform returns the coordinates of the voxel array to the original input coordinate system.
 
@@ -1110,9 +1006,9 @@ std::vector<std::vector<float>> detect_graspable_points::pcd_re_transform(std::v
   // Re-transformation using the parameters in the voxelization step
   for (long unsigned int i = 0; i < voxel_coordinates_of_graspable_points[0].size(); ++i) 
   {
-    graspable_points[0][i] = (voxel_coordinates_of_graspable_points[0][i]*1.0 - voxel_size/4) * voxel_size + offset_vector[0];
-    graspable_points[1][i] = (voxel_coordinates_of_graspable_points[1][i]*1.0 - voxel_size/4) * voxel_size + offset_vector[1];
-    graspable_points[2][i] = (voxel_coordinates_of_graspable_points[2][i]*1.0 - voxel_size/4) * voxel_size + offset_vector[2];
+    graspable_points[0][i] = (voxel_coordinates_of_graspable_points[0][i]*1.0 - VOXEL_SIZE/4) * VOXEL_SIZE + offset_vector[0];
+    graspable_points[1][i] = (voxel_coordinates_of_graspable_points[1][i]*1.0 - VOXEL_SIZE/4) * VOXEL_SIZE + offset_vector[1];
+    graspable_points[2][i] = (voxel_coordinates_of_graspable_points[2][i]*1.0 - VOXEL_SIZE/4) * VOXEL_SIZE + offset_vector[2];
     graspable_points[3][i] = voxel_coordinates_of_graspable_points[3][i];
   }
   return graspable_points;
@@ -1153,7 +1049,7 @@ pcl::PointCloud<pcl::PointXYZ> detect_graspable_points::clusterize(const pcl::Po
 
 // ****** VISUALIZATION (COLOR GRADIENT) ******* //
 
-sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vector<std::vector<float>> array, const MatchingSettings& matching_settings) 
+sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vector<std::vector<float>> array) 
 {
   // Create a marker message
   sensor_msgs::msg::PointCloud2 cloud_msg;
@@ -1205,12 +1101,14 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vec
       //grade_5 = grade_5 + 1;
     }
     // if lower threshold is set, targets below will be set to white
-    if(matching_settings.delete_lower_targets == "on" && point.z < matching_settings.delete_lower_targets_threshold) 
+    
+    if(DELETE_LOWER_TARGETS && point.z < DELETE_LOWER_TARGETS_THRESHOLD) 
     {
       point.r = 255;
       point.g = 255;
       point.b = 255;
     }
+    
     pcl_cloud.push_back(point);
   }
   // Create ROS Message for publishing
@@ -1222,9 +1120,7 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vec
 
 // ****** VISUALIZATION (INTERSECTION CONVEXITY & GRASPABILITY) ******* //
 
-sensor_msgs::msg::PointCloud2 detect_graspable_points::combinedAnalysis(const std::vector<std::vector<float>> array, const pcl::PointCloud<pcl::PointXYZRGB> cloud2,
-                                                                        float distance_threshold,
-                                                                        const MatchingSettings& matching_settings)
+sensor_msgs::msg::PointCloud2 detect_graspable_points::to_msg_format(const std::vector<std::vector<float>> array)
 {
   // this function combines the results of the curvature analysis (peaks) and the graspable points and returns a single point cloud
   // with points which belong to both categories
@@ -1237,7 +1133,7 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::combinedAnalysis(const st
   for (long unsigned int n=0; n<array[0].size(); n++) 
   {
     pcl::PointXYZRGB point;
-    if (array[3][n] >= matching_settings.graspability_threshold && array[2][n] > matching_settings.delete_lower_targets_threshold)
+    if (array[3][n] >= GRASPABILITY_THRESHOLD && array[2][n] > DELETE_LOWER_TARGETS_THRESHOLD)
     {
       point.x = array[0][n];
       point.y = array[1][n];
@@ -1248,25 +1144,11 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::combinedAnalysis(const st
       cloud1.push_back(point);
     }
   }
-  // return the intersection of high graspability score points and convex peaks.
-  // if both points are closer than a distance_threshold, we take it.
-  for (const pcl::PointXYZRGB point1 : cloud1.points) 
-  {
-    for (const pcl::PointXYZRGB point2 : cloud2.points) 
-    {
-      float distance = pcl::euclideanDistance(point1, point2);
-      if (distance < distance_threshold) 
-      {
-      close_points.push_back(point1);
-      close_points.push_back(point2);
-      }
-    }
-  }
-  // Publish to ROS
   #if DEBUG_MOD
-  std::cout << "Points seen as graspable " << close_points.size () << std::endl;
+  std::cout << "Points seen as graspable " << cloud1.size () << std::endl;
   #endif
-  pcl::toROSMsg(close_points, cloud_msg);
+
+  pcl::toROSMsg(cloud1, cloud_msg);
   cloud_msg.header.frame_id="regression_plane_frame";
   cloud_msg.header.stamp = this->now();
   return cloud_msg;

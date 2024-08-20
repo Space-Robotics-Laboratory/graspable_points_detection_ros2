@@ -123,10 +123,9 @@ private:
 	 * @function name : pcd_voxelize()
 	 * @brief : turns the point_cloud into a 3D array of 0 and 1, 0 being void and 1 solid
 	 * @param input_pcd : input point cloud
-	 * @param cube_size : size of the voxel
 	 * @return none
 	 */		
-	std::vector<std::vector<std::vector<int>>> pcd_voxelize (const pcl::PointCloud<pcl::PointXYZ>  input_pcd, const float cube_size);
+	std::vector<std::vector<std::vector<int>>> pcd_voxelize (const pcl::PointCloud<pcl::PointXYZ>  input_pcd);
 
 	/**
 	 * @function name : downsampling() 
@@ -134,10 +133,9 @@ private:
 	 * @param cloud_msg : pointer of sensor_msgs::PointCloud2 (input)
 	 * @param frame_id : reference frame of this point
 	 * @param filtered_points : downsampling points (output)
-	 * @param cube_size : voxel size
 	 * @return none
 	 */		
-	void downsampling(const sensor_msgs::msg::PointCloud2 & cloud_msg, const std::string frame_id, pcl::PointCloud<pcl::PointXYZ> &filtered_points, const float cube_size);
+	void downsampling(const sensor_msgs::msg::PointCloud2 & cloud_msg, const std::string frame_id, pcl::PointCloud<pcl::PointXYZ> &filtered_points);
 
 	void tf_broadcast(const std::string frame_id);
 
@@ -218,30 +216,16 @@ private:
 	 */	
 
 	/**
-	 * @function name : detectTerrainPeaks()
-	 * @brief : estimate the normal vectors of each point and compute the curvature, returns the points with the largest principal curvature eigenvalue
-	 * @param input_cloud : input point cloud
-	 * @param cloud_msg : ROS pointcloud message for visualization
-	 * @param peak_visualization_cloud : output cloud with the peaks
-	 * @return none
-	 */	
-	void detectTerrainPeaks(pcl::PointCloud<pcl::PointXYZ> input_cloud,pcl::PointCloud<pcl::PointXYZRGB> &peak_visualization_cloud, sensor_msgs::msg::PointCloud2 &cloud_msg, 
-							const MatchingSettings& matching_settings);
-
-
-	/**
 	 * @function name : voxel_matching() 
 	 * @brief : finds subset voxel arrays in a major voxel array that matches a gripper mask voxel array.
 	 * @param terrain_matrix : 3-dimensional array composed of 0 and 1
-	 * @param gripper_mask : 3-dimensional array of gripper mask composed of 0 and 1
-	 * @param matching_settings : structure parameters of detection settings set in the config file
 	 * @return voxel_array_of_graspable_points : 4*n matrix, containing subscripts of "grippable" points and "grippability" at those points  
         1st,2nd, and 3rd rows indicate subscripts in x-y-z directions
 		4th row indicates the number of solid
 		voxels, but that of the sub-graspable
 		points is 1
 	 */	
-	std::vector<std::vector<int>> voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix, const MatchingSettings& matching_settings);
+	std::vector<std::vector<int>> voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix);
 
 	/**
 	 * @function name : pcd_re_transform() 
@@ -252,7 +236,7 @@ private:
 	 * @param centroid_vector_of_plane
 	 * @return graspable_points: std::vector<std::vector<float>>
 	 */	
-	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, float voxel_size, std::vector<float> offset_vector);
+	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, std::vector<float> offset_vector);
 
 	/**
 	 * @brief : returns the centroid of each cluster detected
@@ -264,9 +248,9 @@ private:
 	void save3DVectorToFile(const int (&vector3D)[gripper_mask_size][gripper_mask_size][gripper_mask_height], const std::string& filename);
 
 
-	sensor_msgs::msg::PointCloud2 visualizeRainbow(std::vector<std::vector<float>> array, const MatchingSettings& matching_settings);
+	sensor_msgs::msg::PointCloud2 visualizeRainbow(std::vector<std::vector<float>> array);
 
-	sensor_msgs::msg::PointCloud2 combinedAnalysis(const std::vector<std::vector<float>> array, const pcl::PointCloud<pcl::PointXYZRGB> cloud2, float distance_threshold, const MatchingSettings& matching_settings);
+	sensor_msgs::msg::PointCloud2 to_msg_format(const std::vector<std::vector<float>> array);
 
 	std::vector<float> getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud);
 

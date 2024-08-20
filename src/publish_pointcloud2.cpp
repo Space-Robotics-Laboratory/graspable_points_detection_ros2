@@ -14,28 +14,26 @@ class publish_pcl_node : public rclcpp::Node{
     public:
         publish_pcl_node() : Node ("publish_pcl_node")
         {
-            pub1  = this->create_publisher<sensor_msgs::msg::PointCloud2>("/merged_pcd",1);
+            map_pub_  = this->create_publisher<sensor_msgs::msg::PointCloud2>("/merged_pcd",1);
             timer_ = this->create_wall_timer(500ms, std::bind(&publish_pcl_node::publish_message, this));
-            pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/lbr_ws/src/LIMBERO/SUBMODULE/graspable_points_detection_ros2/pcd_data/"+name,cloud);
-            pcl::toROSMsg(cloud, output1);
+            pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/lbr_ws/src/LIMBERO/SUBMODULE/graspable_points_detection_ros2/pcd_data/"+name,pcl_map);
+            pcl::toROSMsg(pcl_map, msg_map);
         }
     private: 
         void publish_message()
         {
-            // Set the header information
-            output1.header.frame_id = "camera_depth_optical_frame";
-            output1.header.stamp = this->now();
-            // Publish the point cloud
-            pub1->publish(output1);
-            std::cout <<name<<" published under the frame :"<<output1.header.frame_id << std::endl;
+            msg_map.header.frame_id = "camera_depth_optical_frame";
+            msg_map.header.stamp = this->now();
+            map_pub_->publish(msg_map);
+            std::cout <<name<<" published under the frame :"<<msg_map.header.frame_id << std::endl;
         }
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub1;
+        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
         rclcpp::TimerBase::SharedPtr timer_;
-        pcl::PointCloud<pcl::PointXYZ> cloud;
-        sensor_msgs::msg::PointCloud2 output1;
+        pcl::PointCloud<pcl::PointXYZ> pcl_map;
+        sensor_msgs::msg::PointCloud2 msg_map;
 
         //please change for the name of the map you want to send for testing
-        std::string name ="testbed.pcd";
+        std::string name ="leaning_bouldering_holds.pcd";
 
 };
 
