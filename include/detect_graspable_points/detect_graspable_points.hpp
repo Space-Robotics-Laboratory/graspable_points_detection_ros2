@@ -270,6 +270,7 @@ private:
 	 */	
 	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, float voxel_size, std::vector<float> offset_vector);												
 
+	void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector3D, const std::string& filename);
 
 
 	sensor_msgs::msg::PointCloud2 visualizeRainbow(std::vector<std::vector<float>> array, const MatchingSettings& matching_settings);
@@ -294,6 +295,7 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr transformed_point_pub_ ;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr point_visualization_marker_pub_ ;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_ ;
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr debugging_pub_ ;
 	tf2_ros::TransformBroadcaster dynamic_tf=tf2_ros::TransformBroadcaster(this);
 
 	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcast_;
