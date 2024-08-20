@@ -51,7 +51,7 @@
 #include <memory>
 #include <rclcpp/time.hpp>
 
-
+#include "settings.hpp"
 
 
 class detect_graspable_points : public rclcpp::Node
@@ -190,7 +190,7 @@ private:
 	 * @param gripper_mask : l*m*n voxelgrid
 	 * @return graspability: the probability of graspability of the respective point
 	 */	
-	float vox_evaluate(const int number_of_points, const std::vector<std::vector<std::vector<int>>>& subset_of_voxel_array, const std::vector<std::vector<std::vector<int>>>& gripper_mask);
+	float vox_evaluate(const int number_of_points, const std::vector<std::vector<std::vector<int>>>& subset_of_voxel_array);
 
 	/**
 	 * @function name : vox_clip() 
@@ -215,7 +215,7 @@ private:
 	 * @return extractev_voxel_array: i*i*j matrix, extracted 3-dimensional voxel array (i*i*j matrix)
 	 */	
 
-	std::vector<std::vector<std::vector<int>>> vox_extract(const std::vector<std::vector<std::vector<int>>>& voxel_array ,const std::vector<int>& position_reference_point, const std::vector<int>& size_extracting);
+	std::vector<std::vector<std::vector<int>>> vox_extract(const std::vector<std::vector<std::vector<int>>>& voxel_array ,const std::vector<int>& position_reference_point, std::array<int,3> size_extracting);
 
 	/**
 	 * @function name : gripper_mask() 
@@ -224,7 +224,7 @@ private:
 	 * @param gripper_param : geometric parameters of the gripper which are set in the config file.
 	 * @return gripper_mask : n*n*m array composed of 0 and 1.
 	 */	
-	std::vector<std::vector<std::vector<int>>> creategrippermask(GripperParam gripper_param, float voxel_size);
+	void creategrippermask(int (&gripper_mask)[gripper_mask_size][gripper_mask_size][gripper_mask_height]);
 	/**
 	 * @function name : gripper_mask() 
 	 * @brief : makes the gripper_mask, which is the 3-dimensional array composed of 0 and 1 considering geometric parameters of the gripper.
@@ -257,7 +257,7 @@ private:
 		voxels, but that of the sub-graspable
 		points is 1
 	 */	
-	std::vector<std::vector<int>> voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix, const std::vector<std::vector<std::vector<int>>>& gripper_mask, const MatchingSettings& matching_settings);
+	std::vector<std::vector<int>> voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix, const MatchingSettings& matching_settings);
 
 	/**
 	 * @function name : pcd_re_transform() 
@@ -270,7 +270,7 @@ private:
 	 */	
 	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, float voxel_size, std::vector<float> offset_vector);												
 
-	void save3DVectorToFile(const std::vector<std::vector<std::vector<int>>>& vector3D, const std::string& filename);
+	void save3DVectorToFile(const int (&vector3D)[gripper_mask_size][gripper_mask_size][gripper_mask_height], const std::string& filename);
 
 
 	sensor_msgs::msg::PointCloud2 visualizeRainbow(std::vector<std::vector<float>> array, const MatchingSettings& matching_settings);
@@ -281,12 +281,13 @@ private:
 
 private:
 	std::string camera_frame;
+	int gripper_mask_[gripper_mask_size][gripper_mask_size][gripper_mask_height];
   	// Node Handle declaration
 	
-//Subcriber
+	//Subcriber
 	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_sub_;
 
-//Publishers
+	//Publishers
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr downsampled_points_pub_ ;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr interpolate_point_pub_ ;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr peaks_pub_ ;
