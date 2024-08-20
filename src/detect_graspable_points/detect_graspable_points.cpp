@@ -34,10 +34,11 @@ detect_graspable_points::detect_graspable_points()
   interpolate_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/interpolated_point", 1);
   peaks_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/peaks_of_convex_surface", 1);
   graspability_map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspability_map", 1);
-  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points", 1); //graspable point
+  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points_before_cluster", 1); //graspable point
   transformed_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/transformed_point", 1);
   point_visualization_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/point_visualization_marker", 1);
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/normal_vector", 1);
+  clusters_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points", 1);
   
   //static broadcaster for now since the computation is quite long and the message are comming one by one not by a constant stream thus leading to sometime messge here for too long and crashing nodes
   tf_static_broadcast_= std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
@@ -45,7 +46,6 @@ detect_graspable_points::detect_graspable_points()
   //debugging publisher to know if the input map is wrong in the first place
   debugging_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/received_map_checking", 1);
 
-  std::cout<<"###-----Before creation-----###"<<std::endl;
   //gripper mask creation for fast access and only create it once for all
   // ****** Gripper mask ******* //
   #if DEBUG_MOD
@@ -271,6 +271,25 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // combine Graspability maxima with convex shape analysis. output the intersection of both.
     results_of_combined_analysis = combinedAnalysis(graspable_points_after_retransform, peak_cloud, distance_threshold, matching_settings);
     combined_pub_->publish(results_of_combined_analysis);
+
+    // ****** Clusterizing ******* //
+    #if DEBUG_MOD
+    auto start_cluster = std::chrono::high_resolution_clock::now();
+    #endif
+    pcl::PointCloud<pcl::PointXYZ> analysis_pcl;
+    pcl::PointCloud<pcl::PointXYZ> clusters_centroid;
+    sensor_msgs::msg::PointCloud2 msg_clusters_centroid;;
+    pcl::fromROSMsg(results_of_combined_analysis,analysis_pcl);
+    clusters_centroid = clusterize(analysis_pcl);
+    pcl::toROSMsg(clusters_centroid,msg_clusters_centroid);
+    msg_clusters_centroid.header.frame_id = results_of_combined_analysis.header.frame_id;
+    msg_clusters_centroid.header.stamp= this->now();
+    #if DEBUG_MOD
+    auto stop_cluster = std::chrono::high_resolution_clock::now();
+    auto duration_cluster = std::chrono::duration_cast<std::chrono::microseconds>(stop_cluster - start_cluster);
+    std::cout <<"Time for clusterizing in µs : " << duration_cluster.count() << std::endl;
+    #endif
+    clusters_pub_->publish(msg_clusters_centroid);
 
     // ****** Overall time consumption ******* //
     auto stop_overall = std::chrono::high_resolution_clock::now();
@@ -870,8 +889,8 @@ void detect_graspable_points::creategrippermask(int (&gripper_mask)[gripper_mask
       }
     }
   }
-  std::string filename = "/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/GripperMask.csv";
-  save3DVectorToFile(gripper_mask, filename);
+  //std::string filename = "/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/GripperMask.csv";
+  //save3DVectorToFile(gripper_mask, filename);
 }
 
 
@@ -1099,6 +1118,39 @@ std::vector<std::vector<float>> detect_graspable_points::pcd_re_transform(std::v
   return graspable_points;
 }
 
+pcl::PointCloud<pcl::PointXYZ> detect_graspable_points::clusterize(const pcl::PointCloud<pcl::PointXYZ> &input_pcl)
+{
+  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+  std::vector<pcl::PointIndices> cluster_indices;
+  ec.setInputCloud(std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(input_pcl));
+  ec.setSearchMethod(tree);
+  ec.setClusterTolerance(palm_diameter/ratio*0.001); //distance between each point
+  ec.setMinClusterSize(1); // Minimum number of points to form a cluster
+  ec.setMaxClusterSize(25000); // Maximum number of points to form a cluster
+  ec.extract(cluster_indices);
+
+  pcl::PointCloud<pcl::PointXYZ> clusters_centroids;
+  // Process each cluster
+  int cluster_id = 0;
+  for (const auto& indices : cluster_indices) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
+    for (int index : indices.indices) 
+    {
+      cluster->points.push_back(input_pcl.points[index]);
+    }
+    // Compute the centroid of the cluster
+    Eigen::Vector4f centroid;
+    pcl::compute3DCentroid(*cluster, centroid);
+    clusters_centroids.push_back(pcl::PointXYZ(centroid[0],centroid[1],centroid[2]));
+    ++cluster_id;
+    }
+  #if DEBUG_MOD
+  std::cout << "Clusters seen as graspable " << clusters_centroids.size () << std::endl;
+  #endif
+  return clusters_centroids;
+}
+
 // ****** VISUALIZATION (COLOR GRADIENT) ******* //
 
 sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vector<std::vector<float>> array, const MatchingSettings& matching_settings) 
@@ -1212,7 +1264,7 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::combinedAnalysis(const st
   }
   // Publish to ROS
   #if DEBUG_MOD
-  std::cout << "published " << close_points.size () << " data points to ROS" << std::endl;
+  std::cout << "Points seen as graspable " << close_points.size () << std::endl;
   #endif
   pcl::toROSMsg(close_points, cloud_msg);
   cloud_msg.header.frame_id="regression_plane_frame";

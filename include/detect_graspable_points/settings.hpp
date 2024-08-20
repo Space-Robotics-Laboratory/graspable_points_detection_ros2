@@ -7,7 +7,7 @@
 #define HUBROBO false
 
   // MatchingSettings
-#define VOXEL_SIZE 0.004 // voxel size [m]
+#define VOXEL_SIZE 0.002 // voxel size [m]
 #define THRESHOLD 100// threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
 #define DELETE_LOWER_TARGETS true // delete the targets whose z positions are lower than a limit value: on or off
 #define DELETE_LOWER_TARGETS_THRESHOLD 0.015 // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)

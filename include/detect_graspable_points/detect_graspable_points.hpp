@@ -42,6 +42,7 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/surface/mls.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
@@ -81,21 +82,6 @@ private:
 		float graspability_threshold;
 	};
 
-	struct GripperParam{
-		float palm_diameter;
-		float palm_diameter_of_finger_joints;
-		float finger_length;
-		float spine_length;
-		float spine_depth;
-		float opening_angle;
-		float closing_angle;
-		float opening_spine_radius; // the distance from the center of palm to the farthest point of the spines
-		float opening_spine_depth;
-		float closing_height; // Vertical distance between the tip of the spine and the bottom of the palm when closed
-		float margin_of_top_solid_diameter;
-		float inside_margin_of_bottom_void_diameter;
-	};
-
 	/**
 	 * @brief This function is called when a point cloud is received to be processed
 	 * 
@@ -122,7 +108,6 @@ private:
 	 * @param rotation_matrix : rotation matrix used for the coordinates transformation (output)
 	 * @return none
 	 */	
-	
 	void pcd_transform ( const pcl::PointCloud<pcl::PointXYZ>  raw_pcd, pcl::PointCloud<pcl::PointXYZ> &transformed_point_cloud, Eigen::Vector4f &centroid_vector_of_plane, Eigen::Matrix3f &rotation_matrix);
 
 	/**
@@ -214,7 +199,6 @@ private:
 	 * @param size_extracting: 1*3 std::vector, size of the of the extracted voxelgrid ,i*i*j
 	 * @return extractev_voxel_array: i*i*j matrix, extracted 3-dimensional voxel array (i*i*j matrix)
 	 */	
-
 	std::vector<std::vector<std::vector<int>>> vox_extract(const std::vector<std::vector<std::vector<int>>>& voxel_array ,const std::vector<int>& position_reference_point, std::array<int,3> size_extracting);
 
 	/**
@@ -268,7 +252,14 @@ private:
 	 * @param centroid_vector_of_plane
 	 * @return graspable_points: std::vector<std::vector<float>>
 	 */	
-	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, float voxel_size, std::vector<float> offset_vector);												
+	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, float voxel_size, std::vector<float> offset_vector);
+
+	/**
+	 * @brief : returns the centroid of each cluster detected
+	 * @param input_pcl
+	 * @return centroid of each cluster in pcl format 
+	 */												
+	pcl::PointCloud<pcl::PointXYZ> clusterize(const pcl::PointCloud<pcl::PointXYZ> &input_pcl);
 
 	void save3DVectorToFile(const int (&vector3D)[gripper_mask_size][gripper_mask_size][gripper_mask_height], const std::string& filename);
 
@@ -294,9 +285,10 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr graspability_map_pub_ ;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr combined_pub_ ;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr transformed_point_pub_ ;
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr debugging_pub_ ;
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr clusters_pub_ ;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr point_visualization_marker_pub_ ;
 	rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_ ;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr debugging_pub_ ;
 	tf2_ros::TransformBroadcaster dynamic_tf=tf2_ros::TransformBroadcaster(this);
 
 	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcast_;
