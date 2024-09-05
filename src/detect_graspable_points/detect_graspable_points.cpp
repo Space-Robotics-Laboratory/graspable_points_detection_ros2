@@ -9,12 +9,9 @@
 */
 
 #include "detect_graspable_points/detect_graspable_points.hpp"
-#include <pcl/filters/filter.h>
-#include <unistd.h>
-#include <stdio.h>
 
 #define DEBUG_MOD true
-#define TEST_MOD false
+#define TEST_MOD true
 
 /*! ******************************
  ***       Constructor       *****
@@ -69,43 +66,8 @@ detect_graspable_points::~detect_graspable_points(){}
 
 void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointCloud2 received_cloud_msg)
 {
-  #if DEBUG_MOD
-  debugging_pub_->publish(received_cloud_msg);
-  #endif
+  camera_frame = received_cloud_msg.header.frame_id;
 
-  #if (TEST_MOD)
-  std::vector<int> x = {0,1,7,1,3,4,4,3,4,9};
-  std::vector<int> y = {0,1,0,5,3,3,4,4,2,2};
-  std::vector<int> z = {0,1,5,1,3,3,4,4,6,5};
-
-  std::vector<std::vector<std::vector<int>>> voxel_for_test;
-  voxel_for_test.resize(10, std::vector<std::vector<int>>(10, std::vector<int>(7,0)));
-  for (int i=0; i<10;i++ ){
-    voxel_for_test[x[i]][y[i]][z[i]]=1;
-  }
-  //clip and substract etc...
-  std::string filename = "/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/test_raw.csv";
-  save3DVectorToFile(voxel_for_test,filename);
-  voxel_for_test = vox_clip(1,1,voxel_for_test);
-  filename = "/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/test_clipped.csv";
-  save3DVectorToFile(voxel_for_test,filename);
-
-  for (int x=0; x<voxel_for_test.size(); x++) 
-  {
-    for (int y=0; y<voxel_for_test[0].size(); y++)
-    {
-      for (int z=0; z<voxel_for_test[0][0].size(); z++)
-      {
-        if (voxel_for_test[x][y][z] != 0)
-        {
-          std::cout<<"clipped: "<<" x: "<< x << " y: "<< y<<" z: "<< z<<std::endl;
-        }
-      }
-    }
-  }
-  #endif
-
-  #if (!TEST_MOD)
   // ************************** //
   std::cout <<"************************ START ************************" << std::endl;
   auto start_overall = std::chrono::high_resolution_clock::now();
@@ -166,7 +128,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     // finish the description related to pcd_transform().
 
     std::vector<std::vector<std::vector<int>>> voxel_matrix;  // important that size needs to be 0 in declaration for the resize to work properly
-    std::vector<float> offset_vector_for_retransform;
+    std::array<float,3> offset_vector_for_retransform;
 
 
     // ****** Interpolate ******* //
@@ -211,7 +173,7 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     #if DEBUG_MOD
     auto start_matching = std::chrono::high_resolution_clock::now();
     #endif
-    graspable_points = voxel_matching(voxel_matrix);
+    graspable_points = voxel_matching(voxel_matrix,offset_vector_for_retransform);
     #if DEBUG_MOD
     std::cout<<"Size of graspable after voxel_matching"<<graspable_points[0].size() <<std::endl;
     auto stop_matching = std::chrono::high_resolution_clock::now();
@@ -264,15 +226,15 @@ void detect_graspable_points::mapReceivedCallBack(const sensor_msgs::msg::PointC
     std::cout <<"Total time in ms : " << duration_overall.count()/1000 << std::endl;
     std::cout <<"************************  END  ************************" << std::endl;
   }
-  #endif
+
 }
 
 
 // ****** SECONDARY FUNCTIONS ******* //
 
-std::vector<float> detect_graspable_points::getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud)
+std::array<float,3> detect_graspable_points::getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud)
 {
-  std::vector<float> minValues(3);
+  std::array<float,3> minValues{0,0,0};
   std::vector<float> x,y,z;
   pcl::PointXYZ point; //variable for storing point values temporary before adding to pcl
   for (long unsigned int i = 0; i < pointCloud.size(); ++i)
@@ -529,11 +491,9 @@ void detect_graspable_points::pcd_least_squares_plane(const pcl::PointCloud<pcl:
   normal_vector_of_plane(0)= real(complex_normal_vector(0));
   normal_vector_of_plane(1)= real(complex_normal_vector(1));
   normal_vector_of_plane(2)= real(complex_normal_vector(2));
-
   centroid_vector_of_plane3f[0]= centroid[0];
   centroid_vector_of_plane3f[1]= centroid[1];
   centroid_vector_of_plane3f[2]= centroid[2]; 
-
   visualizeVector(normal_vector_of_plane, centroid_vector_of_plane3f, "normal_vector", camera_frame);
 }
 
@@ -552,8 +512,7 @@ void detect_graspable_points::pcd_transform ( const pcl::PointCloud<pcl::PointXY
   //transfering values from 4f std::vector to 3f std::vector so .dot computes
   centroid_vector_of_plane3f<< centroid_vector_of_plane[0], centroid_vector_of_plane[1] , centroid_vector_of_plane[2]; 
 
-	float innerproduct_of_centroid_normal_vector = centroid_vector_of_plane3f.dot(normal_vector_of_plane);
-	if (innerproduct_of_centroid_normal_vector > 0) // changes direction of std::vector to be from ground to sky if needed
+	if (centroid_vector_of_plane3f.dot(normal_vector_of_plane) > 0) // changes direction of std::vector to be from ground to sky if needed
   {
 		normal_vector_of_plane = - normal_vector_of_plane;
 	}
@@ -583,7 +542,7 @@ void detect_graspable_points::pcd_transform ( const pcl::PointCloud<pcl::PointXY
   {
     transformed_point_cloud.push_back (pcl::PointXYZ (transformed_point_cloud_matrix(0,i), transformed_point_cloud_matrix(1,i), transformed_point_cloud_matrix(2,i)));
   }
-} 
+}
 
 // ****** INTERPOLATION ******* //
 // Diagrams for better understanding:
@@ -615,10 +574,11 @@ void detect_graspable_points::pcd_interpolate (const pcl::PointCloud<pcl::PointX
 
   //double grid_size = 1/(round(sqrt(raw_pcd.size()/(x_width*y_width)*(5/3))));
   double grid_size = 1/(round(sqrt(raw_pcd.size() / (x_width * y_width)*(5/3) ) * 10000) / 10000);
+  /*
   while (grid_size> VOXEL_SIZE*2){
     grid_size=grid_size/1.2; //not change it too fast to stay close to the target value, if changed manually like grid_size= VOXEL_SIZE*2 causes segfault in voxelization
   }
-
+  */
   // creates the regular std::vector x and y for the grid
   std::vector<double> x_grid_vector, y_grid_vector;
   for (double i = min_y; i < max_y; i+=grid_size)
@@ -707,7 +667,6 @@ std::vector<std::vector<std::vector<int>>> detect_graspable_points::pcd_voxelize
   x.clear();
   y.clear();
   z.clear();
-  std::cout<<"After loop"<<std::endl;
   return voxelized_pcd;
 }
 
@@ -862,7 +821,7 @@ void detect_graspable_points::creategrippermask(int (&gripper_mask)[gripper_mask
 
 // ****** VOXEL MATCHING ******* //
 
-std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix)
+std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix,std::array<float,3> &offset_vector)
 {
   // ****** preparations ******* //
   // Copy inputted terrain data
@@ -893,7 +852,6 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 
   // Now, insert empty voxel layers in z-direction bottom, minus the auxiliary gripper mask layers
   std::vector<int> placeholderZeros(size_of_gripper_mask[2]-EXTRA_SHEET, 0);
-
   for (int i = 0; i < size_of_voxel_array[0]; ++i) {
     for (int j = 0; j < size_of_voxel_array[1]; ++j) {
       terrain_matrix[i][j].insert(terrain_matrix[i][j].begin(), placeholderZeros.begin(), placeholderZeros.end());
@@ -906,11 +864,11 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
   // Find all "ones" (solid voxels) in the search voxel array and change indexes to subscripts of solid voxels
   std::vector<int> size_of_searching_voxel_array = {static_cast<int>(searching_voxel_array.size()), static_cast<int>(searching_voxel_array[0].size()), static_cast<int>(searching_voxel_array[0][0].size())};
   Subscripts subscripts_of_searching_solid_voxels;
-
+  int start_k = std::trunc(std::abs(offset_vector[2])/VOXEL_SIZE + DELETE_LOWER_TARGETS_THRESHOLD/VOXEL_SIZE);
   for (int i = 0; i < size_of_searching_voxel_array[0]; ++i) {
     for (int j = 0; j < size_of_searching_voxel_array[1]; ++j) {
-      for (int k = 0; k < size_of_searching_voxel_array[2]; ++k) {
-        if (searching_voxel_array[i][j][k] != 0) {
+      for (int k = start_k; k < size_of_searching_voxel_array[2]; ++k) {
+        if ( searching_voxel_array[i][j][k] != 0) {
           subscripts_of_searching_solid_voxels.x.push_back(i);
           subscripts_of_searching_solid_voxels.y.push_back(j);
           subscripts_of_searching_solid_voxels.z.push_back(k);
@@ -990,7 +948,7 @@ std::vector<std::vector<int>> detect_graspable_points::voxel_matching(std::vecto
 
 // ****** RE-TRANSFORMATION ******* //
 
-std::vector<std::vector<float>> detect_graspable_points::pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, std::vector<float> offset_vector) 
+std::vector<std::vector<float>> detect_graspable_points::pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, std::array<float,3> offset_vector) 
 {
   //pcd_re_transform returns the coordinates of the voxel array to the original input coordinate system.
 
@@ -1021,14 +979,12 @@ pcl::PointCloud<pcl::PointXYZ> detect_graspable_points::clusterize(const pcl::Po
   std::vector<pcl::PointIndices> cluster_indices;
   ec.setInputCloud(std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(input_pcl));
   ec.setSearchMethod(tree);
-  ec.setClusterTolerance(palm_diameter/ratio*0.001); //distance between each point
-  ec.setMinClusterSize(1); // Minimum number of points to form a cluster
-  ec.setMaxClusterSize(25000); // Maximum number of points to form a cluster
+  ec.setClusterTolerance(PALM_DIAMETER*0.001); //the cluster tolerance in set as something that should not be larger than the palm size in m
+  ec.setMinClusterSize(1);
+  ec.setMaxClusterSize(25000);
   ec.extract(cluster_indices);
 
   pcl::PointCloud<pcl::PointXYZ> clusters_centroids;
-  // Process each cluster
-  int cluster_id = 0;
   for (const auto& indices : cluster_indices) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
     for (int index : indices.indices) 
@@ -1039,7 +995,6 @@ pcl::PointCloud<pcl::PointXYZ> detect_graspable_points::clusterize(const pcl::Po
     Eigen::Vector4f centroid;
     pcl::compute3DCentroid(*cluster, centroid);
     clusters_centroids.push_back(pcl::PointXYZ(centroid[0],centroid[1],centroid[2]));
-    ++cluster_id;
     }
   #if DEBUG_MOD
   std::cout << "Clusters seen as graspable " << clusters_centroids.size () << std::endl;

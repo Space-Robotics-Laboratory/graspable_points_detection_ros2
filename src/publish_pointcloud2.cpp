@@ -16,7 +16,7 @@ class publish_pcl_node : public rclcpp::Node{
         {
             map_pub_  = this->create_publisher<sensor_msgs::msg::PointCloud2>("/merged_pcd",1);
             timer_ = this->create_wall_timer(500ms, std::bind(&publish_pcl_node::publish_message, this));
-            pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/lbr_ws/src/LIMBERO/SUBMODULE/graspable_points_detection_ros2/pcd_data/"+name,pcl_map);
+            pcl::io::loadPCDFile<pcl::PointXYZ>("/home/antonin/ros2_ws/src/graspable_points_detection_ros2/pcd_data/"+name,pcl_map);
             pcl::toROSMsg(pcl_map, msg_map);
         }
     private: 
@@ -33,8 +33,7 @@ class publish_pcl_node : public rclcpp::Node{
         sensor_msgs::msg::PointCloud2 msg_map;
 
         //please change for the name of the map you want to send for testing
-        std::string name ="leaning_bouldering_holds.pcd";
-
+        std::string name ="limbero_testfield_quarted.pcd";
 };
 
 int main(int argc, char **argv)

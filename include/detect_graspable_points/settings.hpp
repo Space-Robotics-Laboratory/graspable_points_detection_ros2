@@ -11,7 +11,6 @@
 #define THRESHOLD 100// threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
 #define DELETE_LOWER_TARGETS true // delete the targets whose z positions are lower than a limit value: on or off
 #define DELETE_LOWER_TARGETS_THRESHOLD 0.015 // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
-#define SEARCHING_RADIUS_FOR_NORMAL_AND_CURVATURE 0.07 // [m] Searching radius for the curvature (SCAR-E: 0.09, HubRobo: 0.03)
 #define EXTRA_SHEET 3 // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
 #define GRASPABILITY_THRESHOLD 90 // Graspability threshold. Above which we can call it graspable with great certainty
 
