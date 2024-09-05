@@ -117,11 +117,11 @@ Copy the point cloud you want to examine into the folder `detect_graspable_point
 
 ## Output
 
-This package output several data for visualization. If you are only interested in the graspable point it is pulished as `/detect_graspable_point/graspable_points`.
+This package output several data for visualization. If you are only interested in the graspable point it is pulished as `/detect_graspable_point/graspable_points`. To choose the different gripper in this file just turn to true the gripper you want to use and flase the others.
 
 ### Gripper Parameters
 
-In the struct from line 27 in `detect_graspable_points.cpp`, you can enter the geometric parameters relevant for the gripper.
+The edition of parameters now takes place in `settings.hpp` in `include/detect_graspbable_points` folder.
 
 Orientate yourself to the simplified dimensions of this gripper:
 
@@ -152,9 +152,8 @@ The matching parameters are the most essential parameters for the graspability a
 | 2   | Threshold of Solid Voxels                      | int             |
 | 3   | Delete lower targets                           | String (on/off) |
 | 4   | Delete lower targets z-threshold               | float [m]       |
-| 5   | Curvature searching radius                     | float [m]       |
-| 6   | Auxiliary void voxel layers above gripper mask | int             |
-| 7   | Graspability threshold                         | int             |
+| 5   | Auxiliary void voxel layers above gripper mask | int             |
+| 6   | Graspability threshold                         | int             |
 
 
 ## Troubleshooting

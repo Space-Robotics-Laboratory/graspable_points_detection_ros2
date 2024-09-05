@@ -601,7 +601,6 @@ void detect_graspable_points::pcd_interpolate (const pcl::PointCloud<pcl::PointX
       {
         interpolated_point_cloud.push_back(pcl::PointXYZ(x_grid_vector[i],y_grid_vector[j],interp_z)); //add the interpolated point
       }
-      
     }
   }
 }

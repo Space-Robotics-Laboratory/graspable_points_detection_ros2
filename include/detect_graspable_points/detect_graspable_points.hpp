@@ -225,7 +225,7 @@ private:
 		voxels, but that of the sub-graspable
 		points is 1
 	 */	
-	std::vector<std::vector<int>> voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix);
+	std::vector<std::vector<int>> voxel_matching(std::vector<std::vector<std::vector<int>>>& terrain_matrix,std::array<float,3> &offset_vector);
 
 	/**
 	 * @function name : pcd_re_transform() 
@@ -236,7 +236,7 @@ private:
 	 * @param centroid_vector_of_plane
 	 * @return graspable_points: std::vector<std::vector<float>>
 	 */	
-	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, std::vector<float> offset_vector);
+	std::vector<std::vector<float>> pcd_re_transform(std::vector<std::vector<int>> voxel_coordinates_of_graspable_points, std::array<float,3> offset_vector);
 
 	/**
 	 * @brief : returns the centroid of each cluster detected
@@ -247,12 +247,11 @@ private:
 
 	void save3DVectorToFile(const int (&vector3D)[gripper_mask_size][gripper_mask_size][gripper_mask_height], const std::string& filename);
 
-
 	sensor_msgs::msg::PointCloud2 visualizeRainbow(std::vector<std::vector<float>> array);
 
 	sensor_msgs::msg::PointCloud2 to_msg_format(const std::vector<std::vector<float>> array);
 
-	std::vector<float> getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud);
+	std::array<float,3> getMinValues(const pcl::PointCloud<pcl::PointXYZ>& pointCloud);
 
 private:
 	std::string camera_frame;
