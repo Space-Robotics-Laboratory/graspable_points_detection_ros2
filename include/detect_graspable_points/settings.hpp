@@ -7,13 +7,11 @@
 #define HUBROBO false
 
   // MatchingSettings
-#define VOXEL_SIZE 0.002 // voxel size [m]
-#define THRESHOLD 100// threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
+#define VOXEL_SIZE 0.001 // voxel size [m]
+#define THRESHOLD 90// threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
 #define DELETE_LOWER_TARGETS true // delete the targets whose z positions are lower than a limit value: on or off
-#define DELETE_LOWER_TARGETS_THRESHOLD 0.015 // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
-#define EXTRA_SHEET 3 // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
 #define GRASPABILITY_THRESHOLD 90 // Graspability threshold. Above which we can call it graspable with great certainty
-
+#define FINNER_INTERPOLATION false //If you need to add more points at interpolation process because the received cloud lack density
 
 // gripper parameters in [mm]!
 //Limbero
@@ -68,30 +66,23 @@
 #define GETMAX(x) *max_element(x.begin(),x.end());
 #define GETMIN(x) *min_element(x.begin(),x.end());
 
-  // Calculate the ratio of voxel size and 1mm in order to keep the gripper size in real world regardless of voxel size
-constexpr float ratio=1/(VOXEL_SIZE * 1000);
-  // Reduce or magnify the gripper's parameters to fit voxel's dimension
-  // Change demensions from [mm] to [voxels]
-constexpr float  palm_diameter= (std::round(PALM_DIAMETER * ratio));
-constexpr float  palm_diameter_of_finger_joints=(std::round(PALM_DIAMETER_OF_FINGER_JOINTS * ratio));
-constexpr float  finger_length =(std::round(FINGER_LENGTH * ratio));
-constexpr float  spine_length =(std::round(SPINE_LENGTH * ratio));
-constexpr float  spine_depth =(std::round(SPINE_DEPTH * ratio));
-constexpr float  opening_spine_radius =(std::round(OPENING_SPINE_RADIUS * ratio));
-
-constexpr float  closing_height =(std::round(CLOSING_HEIGHT * ratio));
-constexpr float  margin_of_top_solid_diameter =(std::round(MARGIN_OF_TOP_SOLID_DIAMETER * ratio));
-constexpr float  inside_margin_of_bottom_void_diameter =(std::round(INSIDE_MARGIN_OF_BOTTOM_VOID_DIAMETER * ratio));
 
 
   // Set the gripper-mask size
-constexpr float  gripper_mask_half_size =((static_cast<float>(palm_diameter_of_finger_joints) / 2) + finger_length + spine_length);
-constexpr int  gripper_mask_size =((static_cast<float>(2 * gripper_mask_half_size)) + 1);
-constexpr int  gripper_mask_height =static_cast<int>(closing_height);
+constexpr float  GRIPPER_MASK_HALF_SIZE =((PALM_DIAMETER_OF_FINGER_JOINTS / 2) + FINGER_LENGTH + SPINE_LENGTH);
+constexpr float  GRIPPER_MASK_SIZE =(2 * GRIPPER_MASK_HALF_SIZE);
+constexpr float  GRIPPER_MASK_HEIGHT =(CLOSING_HEIGHT);
 
   // Calculate the parameters to determine solid area and void area
-constexpr float  gripper_mask_top_solid_radius =std::round((palm_diameter + margin_of_top_solid_diameter) / 2);
-constexpr float  gripper_mask_clearance =(std::round((TO_FLOAT(gripper_mask_size) - palm_diameter) / 2 * std::tan((90 - OPENING_ANGLE)*(M_PI/180.0))));
-constexpr float  gripper_mask_bottom_void_radius =(std::round((palm_diameter / 2 )+ (TO_FLOAT(gripper_mask_height) * std::tan((CLOSING_ANGLE)*(M_PI/180.0))) - inside_margin_of_bottom_void_diameter));
+constexpr float  GRIPPER_MASK_TOP_SOLID_RADIUS =(PALM_DIAMETER + MARGIN_OF_TOP_SOLID_DIAMETER) / 2;
+constexpr float  GRIPPER_MASK_CLEARANCE =(((GRIPPER_MASK_SIZE) - PALM_DIAMETER) / 2 * std::tan((90 - OPENING_ANGLE)*(M_PI/180.0)));
+constexpr float  GRIPPER_MASK_BOTTOM_VOID_RADIUS =((PALM_DIAMETER / 2)+ ((GRIPPER_MASK_HEIGHT) * std::tan((CLOSING_ANGLE)*(M_PI/180.0))) - INSIDE_MARGIN_OF_BOTTOM_VOID_DIAMETER);
+
+    /*
+    if(((point.z>max_z-GRIPPER_MASK_CLEARANCE)&&(point.z<max_z) &&(distance_from_center_of_layer < grippable_radius) && (distance_from_center_of_layer > unreachble_radius))||
+        ((point.z <max_z-GRIPPER_MASK_CLEARANCE) && (distance_from_center_of_layer > GRIPPER_MASK_BOTTOM_VOID_RADIUS))||
+        (((z_subscript) < std::round(GRIPPER_MASK_CLEARANCE*1.75)) && (TO_FLOAT(z_subscript) > GRIPPER_MASK_CLEARANCE))) //added conditio to ave a bigger hole at the bottom of gripper)
+    */
+    //(point.z >max_z-GRIPPER_MASK_HEIGHT) && 
 
 
