@@ -125,7 +125,7 @@ The edition of parameters now takes place in `settings.hpp` in `include/detect_g
 
 Orientate yourself to the simplified dimensions of this gripper:
 
-<img src="fig_for_understanding/Gripper_dimensions.png" alt="drawing" width="600"/>
+<img src="include/fig_for_understanding/Gripper_dimensions.png" alt="drawing" width="600"/>
 
 | No. | Variable                       | Explanation                                                                           |
 |-----|--------------------------------|---------------------------------------------------------------------------------------|
@@ -150,10 +150,8 @@ The matching parameters are the most essential parameters for the graspability a
 |-----|------------------------------------------------|-----------------|
 | 1   | Voxel size                                     | float [m]       |
 | 2   | Threshold of Solid Voxels                      | int             |
-| 3   | Delete lower targets                           | String (on/off) |
-| 4   | Delete lower targets z-threshold               | float [m]       |
-| 5   | Auxiliary void voxel layers above gripper mask | int             |
-| 6   | Graspability threshold                         | int             |
+| 3   | Graspability threshold                         | int             |
+| 4   | FINNER_INTERPOLATION                           | float           |
 
 
 ## Troubleshooting
