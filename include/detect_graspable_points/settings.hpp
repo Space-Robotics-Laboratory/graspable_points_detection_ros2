@@ -9,10 +9,10 @@
   // MatchingSettings
 #define VOXEL_SIZE 0.002 // voxel size [m]
 #define THRESHOLD 100// threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
-#define DELETE_LOWER_TARGETS true // delete the targets whose z positions are lower than a limit value: on or off
-#define DELETE_LOWER_TARGETS_THRESHOLD 0.015 // [m] Lower threshold of targets (Apr8_realtime: 0.025, Scanned: -0.05, Simulated: -0.07, primitive: 0.01, leaning_bouldering_holds: 0.01)
+#define ARTFICIALY_ADD_POINTS false // choose wether or not you want to add more points during interpolation process in case of sparse map
+#define DELETE_LOWER_TARGETS_THRESHOLD 0.015 // [m] Lower threshold of targets
 #define EXTRA_SHEET 3 // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
-#define GRASPABILITY_THRESHOLD 90 // Graspability threshold. Above which we can call it graspable with great certainty
+#define GRASPABILITY_THRESHOLD 90 // [%] Graspability threshold. Above which we can call it graspable with great certainty
 
 
 // gripper parameters in [mm]!

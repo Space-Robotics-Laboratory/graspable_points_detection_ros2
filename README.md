@@ -125,7 +125,7 @@ The edition of parameters now takes place in `settings.hpp` in `include/detect_g
 
 Orientate yourself to the simplified dimensions of this gripper:
 
-<img src="fig_for_understanding/Gripper_dimensions.png" alt="drawing" width="600"/>
+<img src="include/fig_for_understanding/Gripper_dimensions.png" alt="drawing" width="600"/>
 
 | No. | Variable                       | Explanation                                                                           |
 |-----|--------------------------------|---------------------------------------------------------------------------------------|
@@ -146,16 +146,16 @@ Orientate yourself to the simplified dimensions of this gripper:
 
 The matching parameters are the most essential parameters for the graspability and curvature analysis. 
 
-| No. | Variable                                       | Data type       |
-|-----|------------------------------------------------|-----------------|
-| 1   | Voxel size                                     | float [m]       |
-| 2   | Threshold of Solid Voxels                      | int             |
-| 3   | Delete lower targets                           | String (on/off) |
-| 4   | Delete lower targets z-threshold               | float [m]       |
-| 5   | Auxiliary void voxel layers above gripper mask | int             |
-| 6   | Graspability threshold                         | int             |
+| No. | Variable                                       | Data type       | Explanation                                                    |
+|-----|------------------------------------------------|-----------------|----------------------------------------------------------------|
+| 1   | Voxel size                                     | float [m]       | Size of voxels you want to use                                 |
+| 2   | Threshold of Solid Voxels                      | int             | Number of solid voxels needed to not apply penalty coefficient |
+| 3   | Artificial_add_point                           | String (on/off) | True if you think your map is too sparse for running properly  |
+| 4   | Delete lower targets z-threshold               | float [m]       | Threshold below which point are not checked for graspability   |
+| 5   | Auxiliary void voxel layers above gripper mask | int             | Empty layers to avoid false matching on too convex shape       |
+| 6   | Graspability threshold                         | int             | Graspability above which we consider graspable with certainty  |
 
 
 ## Troubleshooting
 
-If libinterpolated dosn't get build even after installing catch2, make sure to have GSL installed and restarting your computer might help.
+- If libinterpolated dosn't get build even after installing catch2, make sure to have GSL installed and restarting your computer might help.

@@ -11,7 +11,6 @@
 #include "detect_graspable_points/detect_graspable_points.hpp"
 
 #define DEBUG_MOD true
-#define TEST_MOD true
 
 /*! ******************************
  ***       Constructor       *****
@@ -31,11 +30,11 @@ detect_graspable_points::detect_graspable_points()
   interpolate_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/interpolated_point", 1);
   peaks_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/peaks_of_convex_surface", 1);
   graspability_map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspability_map", 1);
-  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points_before_cluster", 1); //graspable point
+  combined_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points_before_cluster", 1); 
   transformed_point_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/transformed_point", 1);
   point_visualization_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/point_visualization_marker", 1);
   marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker> (topic_prefix + "/normal_vector", 1);
-  clusters_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points", 1);
+  clusters_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2> (topic_prefix + "/graspable_points", 1); //graspable point
   
   //static broadcaster for now since the computation is quite long and the message are comming one by one not by a constant stream thus leading to sometime messge here for too long and crashing nodes
   tf_static_broadcast_= std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
@@ -572,13 +571,14 @@ void detect_graspable_points::pcd_interpolate (const pcl::PointCloud<pcl::PointX
   double x_width = max_x-min_x;
   double y_width = max_y-min_y;
 
-  //double grid_size = 1/(round(sqrt(raw_pcd.size()/(x_width*y_width)*(5/3))));
   double grid_size = 1/(round(sqrt(raw_pcd.size() / (x_width * y_width)*(5/3) ) * 10000) / 10000);
-  /*
+  
+  #if ARTFICIALY_ADD_POINTS
   while (grid_size> VOXEL_SIZE*2){
     grid_size=grid_size/1.2; //not change it too fast to stay close to the target value, if changed manually like grid_size= VOXEL_SIZE*2 causes segfault in voxelization
   }
-  */
+  #endif
+
   // creates the regular std::vector x and y for the grid
   std::vector<double> x_grid_vector, y_grid_vector;
   for (double i = min_y; i < max_y; i+=grid_size)
@@ -1056,7 +1056,7 @@ sensor_msgs::msg::PointCloud2 detect_graspable_points::visualizeRainbow(std::vec
     }
     // if lower threshold is set, targets below will be set to white
     
-    if(DELETE_LOWER_TARGETS && point.z < DELETE_LOWER_TARGETS_THRESHOLD) 
+    if(point.z < DELETE_LOWER_TARGETS_THRESHOLD) 
     {
       point.r = 255;
       point.g = 255;
