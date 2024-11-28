@@ -1,115 +1,130 @@
 # SRL_GraspableTargetDetection
+
 Geometry based graspable target detection for legged robots.
 
 Originated in the Space Robotics Lab (SRL) of the Tohoku University. Based on ClimbLab (Uno et al. 2022).
 
 ## Authors and Maintainers
 
-*   Jitao Zheng (jitao.zheng@tum.de)
+* Jitao Zheng (jitao.zheng@tum.de)
 
-*   Taku Okawara (taku.okawara.t3@dc.tohoku.ac.jp)
+* Taku Okawara (taku.okawara.t3@dc.tohoku.ac.jp)
 
-*   Kentaro Uno (unoken@astro.mech.tohoku.ac.jp)
+* Kentaro Uno (unoken@astro.mech.tohoku.ac.jp)
 
-*   Antonin Ringeval-Meusnier (r.antonin@orange.fr)
+* Antonin Ringeval-Meusnier (r.antonin@orange.fr)
 
 ## System Requirements
 
-The code was tested on: 
-*   ROS Humble
-*   Ubuntu 22.04
-*   gcc version 11.4.0
+The code was tested on:
+
+* ROS Humble
+* Ubuntu 22.04
+* gcc version 11.4.0
 
 You will require the following packages and libraries:
-*   Point Cloud Library (PCL)
-*   LibInterpolate
-*   Eigen3
 
+* Point Cloud Library (PCL)
+* LibInterpolate
+* Eigen3
 
-## Installation of LibInterpolate
+## Environment Setup
 
-```
-git clone https://github.com/CD3/libInterpolate
-cd libInterpolate
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-```
+1. Installation of Catch2
 
-## Make Sure that you have ALL the pcl libraries installed
+    ```bash
+    git clone https://github.com/catchorg/Catch2.git
+    cd Catch2
+    cmake -B build -S . -DBUILD_TESTING=OFF
+    sudo cmake --build build/ --target install
+    ```
 
-If you don't have yet installed Point Cloud Library (PCL), you can install it by typing:
+2. Installation of LibInterpolate
 
-```
-sudo apt install libpcl-dev
-```
+    ```bash
+    git clone https://github.com/CD3/libInterpolate
+    cd libInterpolate
+    mkdir build
+    cd build
+    cmake ..
+    make
+    sudo make install
+    ```
 
-This one was missing so be sure to install it
+3. Make Sure that you have ALL the pcl libraries installed
 
-```
-sudo apt install ros-humble-ros-pcl 
-```
+    If you don't have yet installed Point Cloud Library (PCL), you can install it by typing:
 
+    ```bash
+    sudo apt install libpcl-dev
+    sudo apt install ros-humble-pcl-ros
+    ```
 
 ## Quick Start
-
 
 Open a new terminal window.
 
 Type:
 
-```
+```bash
 cd ~/ros2_ws/src
 ```
+
 Clone the repository:
-```
-git clone <address>
+
+```bash
+git clone git@github.com:Space-Robotics-Laboratory/graspable_points_detection_ros2.git
 ```
 
 Then we can build it:
 
-```
+```bash
 cd ..
-colcon_build
+colcon build
 ```
 
 IMPORTANT, don't forget to sourcing the packages you just build in order for them to show when you want to run them:
-```
+
+```bash
 source install/setup.bash
 ```
 
 We will first test the algorithm on some examples. You will need at least three terminals.
 
-*Terminal 1*
+1. *Terminal 1*
 
-Launch the graspable target detection.
-```
-cd ~/ros2_ws
-source install/setup.bash
-ros2 run detect_graspable_points detect_graspable_points_main 
-```
-The algorithm subscribes to a point cloud message `merged_pcd` in `sensor_msgs/PointCloud2` format. So in principle, you can subscribe to any tope
+    Launch the graspable target detection.
 
-*Terminal 2*
+    ```bash
+    cd ~/ros2_ws
+    source install/setup.bash
+    ros2 run detect_graspable_points detect_graspable_points_main
+    ```
 
-Publish stored example point cloud.
-```
-cd ~/ros2_ws
-source install/setup.bash
-ros2 run detect_graspable_points publish_pointcloud2
-```
-Now, a point cloud in *.pcd* format will be published once per second as `sensor_msgs/PointCloud2` message under the topic `/merged_pcd` in the `regression_plane_frame` coordinate frame.
+    The algorithm subscribes to a point cloud message `merged_pcd` in `sensor_msgs/PointCloud2` format. So in principle, you can subscribe to any tope
 
-*Terminal 3*
+2. *Terminal 2*
 
-Open RVIZ.
-```
-cd
-ros2 run rviz2 rviz2
-```
-You can freely choose which topic you want to visualize, whether that is the raw point cloud with the graspable points (light green spheres) or the color gradient of Graspability Score.
+    Publish stored example point cloud.
+
+    ```bash
+    cd ~/ros2_ws
+    source install/setup.bash
+    ros2 run detect_graspable_points publish_pointcloud2
+    ```
+
+    Now, a point cloud in *.pcd* format will be published once per second as `sensor_msgs/PointCloud2` message under the topic `/merged_pcd` in the `regression_plane_frame` coordinate frame.
+
+3. *Terminal 3*
+
+    Open RViz.
+
+    ```bash
+    cd
+    ros2 run rviz2 rviz2
+    ```
+
+    You can freely choose which topic you want to visualize, whether that is the raw point cloud with the graspable points (light green spheres) or the color gradient of Graspability Score.
 
 ### Input Point Cloud
 
@@ -144,7 +159,7 @@ Orientate yourself to the simplified dimensions of this gripper:
 
 ### Matching Parameters
 
-The matching parameters are the most essential parameters for the graspability and curvature analysis. 
+The matching parameters are the most essential parameters for the graspability and curvature analysis.
 
 | No. | Variable                                       | Data type       | Explanation                                                    |
 |-----|------------------------------------------------|-----------------|----------------------------------------------------------------|
@@ -155,7 +170,6 @@ The matching parameters are the most essential parameters for the graspability a
 | 5   | Auxiliary void voxel layers above gripper mask | int             | Empty layers to avoid false matching on too convex shape       |
 | 6   | Graspability threshold                         | int             | Graspability above which we consider graspable with certainty  |
 
-
 ## Troubleshooting
 
-- If libinterpolated dosn't get build even after installing catch2, make sure to have GSL installed and restarting your computer might help.
+* If libinterpolated dosn't get build even after installing catch2, make sure to have GSL installed and restarting your computer might help.
