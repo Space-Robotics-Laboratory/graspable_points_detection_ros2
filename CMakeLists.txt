@@ -12,7 +12,9 @@ endif()
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rcpputils REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(pcl_conversions REQUIRED)
@@ -114,11 +116,6 @@ install(DIRECTORY launch
 install(DIRECTORY include/
   DESTINATION include
 )
-
-
-
-# Export include directories
-#ament_export_include_directories(include)
 
 # Generate and install package configuration
 ament_package()

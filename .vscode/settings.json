@@ -99,8 +99,13 @@
     "variant": "cpp"
   },
   "cSpell.words": [
+    "Eigen",
+    "GNUCXX",
     "limbero",
+    "pointcloud",
     "rclcpp",
-    "rcpputils"
+    "rcpputils",
+    "Wextra",
+    "Wpedantic"
   ]
 }
