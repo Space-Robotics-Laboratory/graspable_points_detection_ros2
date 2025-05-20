@@ -9,7 +9,6 @@
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="naomasa@todo.todo">naomasa</maintainer>
 
-
   <!-- One license tag required, multiple allowed, one license per tag -->
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
@@ -26,12 +25,10 @@
   <depend>sensor_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>Eigen3</depend>
-  <depend>PCL</depend>
-
-
+  <depend>libpcl-dev</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
- <export>
+  <export>
     <build_type>ament_cmake</build_type>
   </export>
 </package>
