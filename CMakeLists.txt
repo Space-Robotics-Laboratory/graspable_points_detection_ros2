@@ -22,7 +22,6 @@ find_package(pcl_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(PCL REQUIRED)
 find_package(libInterpolate REQUIRED)
 find_package(PCL 1.10 REQUIRED COMPONENTS common io filters)  # Adjust version as necessary
 
