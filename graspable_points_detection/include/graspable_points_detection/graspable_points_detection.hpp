@@ -31,6 +31,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
+#include "graspable_points_detection/gripper_params.hpp"
+#include "graspable_points_detection/matching_params.hpp"
 #include "graspable_points_detection/visibility_control.hpp"
 #include <rclcpp/rclcpp.hpp>
 
