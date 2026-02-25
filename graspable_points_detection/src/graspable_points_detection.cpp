@@ -24,6 +24,8 @@
 
 #include "graspable_points_detection/graspable_points_detection.hpp"
 
+#include <cmath>
+
 // PCL
 #include <pcl/common/common.h>
 #include <pcl/common/transforms.h>
@@ -40,6 +42,52 @@
 #include <rclcpp_components/register_node_macro.hpp>
 
 #define DEBUG true
+
+namespace
+{
+
+using namespace graspable_points_detection;
+
+// Calculate the ratio of voxel size and 1mm in order to keep the gripper size in real world regardless of voxel size
+constexpr float kRatio = 1.0f / (kVoxelSize * 1000.0f);
+
+// Reduce or magnify the gripper's parameters to fit voxel's dimension
+// Change demensions from [mm] to [voxels]
+const float kPalmDiameter = std::round(kGripperParams.palm_diameter * kRatio);
+const float kPalmDiameterOfFingerJoints =
+  std::round(kGripperParams.palm_diameter_of_finger_joints * kRatio);
+const float kFingerLength = std::round(kGripperParams.finger_length * kRatio);
+const float kSpineLength = std::round(kGripperParams.spine_length * kRatio);
+const float kSpineDepth = std::round(kGripperParams.spine_depth * kRatio);
+const float kOpeningSpineRadius = std::round(kGripperParams.opening_spine_radius * kRatio);
+const float kOpeningSpineDepth = std::round(kGripperParams.opening_spine_depth * kRatio);
+const float kClosingHeight = std::round(kGripperParams.closing_height * kRatio);
+const float kMarginOfTopSolidDiameter =
+  std::round(kGripperParams.margin_of_top_solid_diameter * kRatio);
+const float kInsideMarginOfBottomVoidDiameter =
+  std::round(kGripperParams.inside_margin_of_bottom_void_diameter * kRatio);
+
+// Set the gripper-mask size
+const float kGripperMaskHalfSize =
+  (kPalmDiameterOfFingerJoints / 2.0f) + kFingerLength + kSpineLength;
+const int kGripperMaskSize = static_cast<int>(2.0f * kGripperMaskHalfSize) + 1;
+const int kGripperMaskHeight = static_cast<int>(kClosingHeight);
+
+// Calculate the parameters to determine solid area and void area
+const float kGripperMaskTopSolidRadius =
+  std::round((kPalmDiameter + kMarginOfTopSolidDiameter) / 2.0f);
+
+const float kGripperMaskClearance = std::round(
+  (static_cast<float>(kGripperMaskSize) - kPalmDiameter) / 2.0f *
+  std::tan((90.0f - kGripperParams.opening_angle) * (M_PI / 180.0)));
+
+const float kGripperMaskBottomVoidRadius = std::round(
+  (kPalmDiameter / 2.0f) +
+  (static_cast<float>(kGripperMaskHeight) *
+   std::tan(kGripperParams.closing_angle * (M_PI / 180.0))) -
+  kInsideMarginOfBottomVoidDiameter);
+
+}  // anonymous namespace
 
 namespace graspable_points_detection
 {
@@ -63,6 +111,17 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
 
   // TF
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
+
+#if DEBUG
+  auto start_mask = std::chrono::high_resolution_clock::now();
+#endif
+  createGripperMask();
+#if DEBUG
+  auto stop_mask = std::chrono::high_resolution_clock::now();
+  auto duration_mask =
+    std::chrono::duration_cast<std::chrono::microseconds>(stop_mask - start_mask);
+  std::cout << "Time for creation of gripper mask in µs : " << duration_mask.count() << std::endl;
+#endif
 
   RCLCPP_INFO(this->get_logger(), "/%s node is constructed.", this->get_name());
 }
@@ -395,6 +454,71 @@ void GraspablePointsDetection::broadcastRegressionPlaneTF(
   tf.transform.rotation.w = q.w();
 
   tf_broadcaster_->sendTransform(tf);
+}
+
+void GraspablePointsDetection::createGripperMask()
+{
+  gripper_mask_.assign(
+    kGripperMaskSize,
+    std::vector<std::vector<int>>(kGripperMaskSize, std::vector<int>(kGripperMaskHeight, 0)));
+
+  float opening_depth = kOpeningSpineDepth;
+  if (opening_depth == 1.0f) {
+    opening_depth = 2.0f;
+  }
+
+  for (int z = 0; z < kGripperMaskHeight; ++z) {
+    float z_val = static_cast<float>(z + 1);
+
+    // Compute radius of inner cone and outer solid area
+    float graspable_radius = kGripperMaskTopSolidRadius +
+      (kGripperMaskHalfSize - kGripperMaskTopSolidRadius) * static_cast<float>(z) /
+        (kGripperMaskClearance - 1.0f);
+
+    float unreachable_radius = kGripperMaskHalfSize -
+      std::round(kGripperMaskHalfSize - (kOpeningSpineRadius + kSpineDepth)) *
+        static_cast<float>(z) / (opening_depth - 1.0f);
+
+    for (int y = 0; y < kGripperMaskSize; ++y) {
+      float dy = kGripperMaskHalfSize - static_cast<float>(y);
+
+      for (int x = 0; x < kGripperMaskSize; ++x) {
+        float dx = kGripperMaskHalfSize - static_cast<float>(x);
+
+        // Distance from center of layer
+        float dist = std::hypot(dx, dy);
+
+        bool is_solid = false;
+
+        // Interference determination logic expression
+        // Judges whether it is a solid(1) region or not
+        if (z_val <= kGripperMaskClearance) {
+          // Conditions for the lower half
+          if (
+            dist < graspable_radius ||
+            dist > unreachable_radius *
+                2.0f  //added a times 2 to prevent having walls in the gripper shape
+          ) {
+            is_solid = true;
+          }
+        } else {
+          // Conditions for the upper half
+          if (
+            dist >
+              kGripperMaskBottomVoidRadius ||  //added condition to ave a bigger hole at the bottom of gripper
+            z_val < std::round(kGripperMaskClearance * 1.75f)) {
+            is_solid = true;
+          }
+        }
+
+        if (is_solid) {
+          // Set the element as 1
+          // Flip the gripper mask vertically
+          gripper_mask_[x][y][(kGripperMaskHeight - 1) - z] = 1;
+        }
+      }
+    }
+  }
 }
 
 }  // namespace graspable_points_detection

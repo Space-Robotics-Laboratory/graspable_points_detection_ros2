@@ -84,6 +84,8 @@ private:
     const Eigen::Vector4f & centroid, const Eigen::Matrix3f & rotation_matrix,
     const std::string & parent_frame, const std::string & child_frame);
 
+  void createGripperMask();
+
   // Publishers
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr downsampled_point_cloud_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr interpolated_point_cloud_pub_;
@@ -97,6 +99,8 @@ private:
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // Variables
+  std::vector<std::vector<std::vector<int>>> gripper_mask_;
+
   builtin_interfaces::msg::Time msg_stamp_;
 };
 
