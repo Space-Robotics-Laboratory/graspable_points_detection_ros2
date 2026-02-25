@@ -21,6 +21,9 @@
 #ifndef GRASPABLE_POINTS_DETECTION__GRASPABLE_POINTS_DETECTION_HPP_
 #define GRASPABLE_POINTS_DETECTION__GRASPABLE_POINTS_DETECTION_HPP_
 
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -51,9 +54,14 @@ public:
   virtual ~GraspablePointsDetection();
 
 private:
-  void pointCloudCallBack(const sensor_msgs::msg::PointCloud2 point_cloud_msg);
+  void pointCloudCallBack(const sensor_msgs::msg::PointCloud2::ConstSharedPtr point_cloud_msg);
+
+  void downsample(
+    const sensor_msgs::msg::PointCloud2 & pcd_msg,
+    pcl::PointCloud<pcl::PointXYZ> & downsampled_pcd);
 
   // Publishers
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr downsampled_point_clout_pub_;
 
   // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
