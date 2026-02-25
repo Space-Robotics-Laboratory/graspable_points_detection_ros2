@@ -38,12 +38,22 @@ namespace graspable_points_detection
 GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & options)
 : rclcpp::Node("graspable_points_detection", options)
 {
+  // Subscriber
+  point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    "/merged_pcd", 1,
+    std::bind(&GraspablePointsDetection::pointCloudCallBack, this, std::placeholders::_1));
+
   RCLCPP_INFO(this->get_logger(), "/%s node is constructed.", this->get_name());
 }
 
 GraspablePointsDetection::~GraspablePointsDetection()
 {
   RCLCPP_INFO(this->get_logger(), "/%s node is destructed.", this->get_name());
+}
+
+void GraspablePointsDetection::pointCloudCallBack(
+  const sensor_msgs::msg::PointCloud2 point_cloud_msg)
+{
 }
 
 }  // namespace graspable_points_detection

@@ -35,6 +35,8 @@
 #include "graspable_points_detection/matching_params.hpp"
 #include "graspable_points_detection/visibility_control.hpp"
 #include <rclcpp/rclcpp.hpp>
+// #include <sensor_msgs/msg/point_cloud.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 
 namespace graspable_points_detection
 {
@@ -49,9 +51,12 @@ public:
   virtual ~GraspablePointsDetection();
 
 private:
+  void pointCloudCallBack(const sensor_msgs::msg::PointCloud2 point_cloud_msg);
+
   // Publishers
 
   // Subscriber
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
 };
 
 }  // namespace graspable_points_detection
