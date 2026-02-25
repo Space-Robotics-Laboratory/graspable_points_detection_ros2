@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.8)
 project(graspable_points_detection)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic -O3)
+  add_compile_definitions(EIGEN_NO_DEBUG)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
