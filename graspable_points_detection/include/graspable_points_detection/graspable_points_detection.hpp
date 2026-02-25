@@ -23,6 +23,7 @@
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include <chrono>
 #include <cmath>
@@ -38,10 +39,8 @@
 #include "graspable_points_detection/matching_params.hpp"
 #include "graspable_points_detection/visibility_control.hpp"
 #include <rclcpp/rclcpp.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-// #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-
+#include <visualization_msgs/msg/marker.hpp>
 namespace graspable_points_detection
 {
 
@@ -57,9 +56,9 @@ public:
 private:
   void pointCloudCallBack(const sensor_msgs::msg::PointCloud2::ConstSharedPtr point_cloud_msg);
 
-  void downsample(
+  void downsamplePointCloud(
     const sensor_msgs::msg::PointCloud2 & pcd_msg,
-    pcl::PointCloud<pcl::PointXYZ> & downsampled_pcd);
+    pcl::PointCloud<pcl::PointXYZ> & downsampled_cloud);
 
   void estimateRegressionPlaneNormal(
     const pcl::PointCloud<pcl::PointXYZ> & raw_cloud, const Eigen::Vector4f & centroid,
@@ -70,17 +69,32 @@ private:
     pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, Eigen::Vector4f & centroid,
     Eigen::Matrix3f & rotation_matrix);
 
+  void interpolatePointCloud(
+    const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
+    pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud);
+
   void visualizeVector(
     const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,
     const std::string & frame_id, const std::string & object_name);
 
+  void broadcastRegressionPlaneTF(
+    const Eigen::Vector4f & centroid, const Eigen::Matrix3f & rotation_matrix,
+    const std::string & parent_frame, const std::string & child_frame);
+
   // Publishers
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr downsampled_point_clout_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr downsampled_point_cloud_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr interpolated_point_cloud_pub_;
 
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr normal_vector_marker_pub_;
 
   // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_sub_;
+
+  // TF
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
+  // Variables
+  builtin_interfaces::msg::Time msg_stamp_;
 };
 
 }  // namespace graspable_points_detection

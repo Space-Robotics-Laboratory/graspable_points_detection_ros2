@@ -25,11 +25,17 @@
 #include "graspable_points_detection/graspable_points_detection.hpp"
 
 // PCL
+#include <pcl/common/common.h>
 #include <pcl/common/transforms.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+// libInterpolate
+// #include <libInterpolate/AnyInterpolator.hpp>
+#include <libInterpolate/Interpolate.hpp>
+
+// ROS
 #include <geometry_msgs/msg/point.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -42,8 +48,10 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
 : rclcpp::Node("graspable_points_detection", options)
 {
   // Publishers
-  downsampled_point_clout_pub_ =
+  downsampled_point_cloud_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/downsampled_points", 1);
+  interpolated_point_cloud_pub_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("~/interpolated_points", 1);
 
   normal_vector_marker_pub_ =
     this->create_publisher<visualization_msgs::msg::Marker>("~/normal_vector", 1);
@@ -52,6 +60,9 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "/merged_pcd", 1,  // TODO: Parameterize topic name
     std::bind(&GraspablePointsDetection::pointCloudCallBack, this, std::placeholders::_1));
+
+  // TF
+  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
 
   RCLCPP_INFO(this->get_logger(), "/%s node is constructed.", this->get_name());
 }
@@ -62,30 +73,34 @@ GraspablePointsDetection::~GraspablePointsDetection()
 }
 
 void GraspablePointsDetection::pointCloudCallBack(
-  const sensor_msgs::msg::PointCloud2::ConstSharedPtr point_cloud_msg)
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr received_cloud_msg)
 {
   RCLCPP_INFO(this->get_logger(), "========== Detecting Graspable Points... ==========");
 
-  pcl::PointCloud<pcl::PointXYZ> downsampled_pcd;
-  downsample(*point_cloud_msg, downsampled_pcd);
+  msg_stamp_ = received_cloud_msg->header.stamp;
 
-  if (downsampled_pcd.points.size() < 3) {
+  // === Downsample ===
+
+  pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
+  downsamplePointCloud(*received_cloud_msg, downsampled_cloud);
+
+  if (downsampled_cloud.points.size() < 3) {
     // HACK: No faces. Process will have segmentation fault.
     // RCLCPP_WARN(this->get_logger(), "");
     return;
   }
 
-  Eigen::Vector4f centroid_point;
-  Eigen::Matrix3f rotation_matrix;
-  pcl::PointCloud<pcl::PointXYZ> transformed_pcd;
-
   // === Transform ===
+
 #if DEBUG
   auto start_transform = std::chrono::high_resolution_clock::now();
 #endif
 
+  Eigen::Vector4f centroid_point;
+  Eigen::Matrix3f rotation_matrix;
+  pcl::PointCloud<pcl::PointXYZ> transformed_cloud;
   alignPointCloudToRegressionPlane(
-    downsampled_pcd, transformed_pcd, centroid_point, rotation_matrix);
+    downsampled_cloud, transformed_cloud, centroid_point, rotation_matrix);
 
 #if DEBUG
   auto stop_transform = std::chrono::high_resolution_clock::now();
@@ -93,17 +108,35 @@ void GraspablePointsDetection::pointCloudCallBack(
     std::chrono::duration_cast<std::chrono::microseconds>(stop_transform - start_transform);
   std::cout << "Time for transformation in µs : " << duration_transform.count() << std::endl;
 #endif
+
+  // === Interpolate ===
+
+#if DEBUG
+  auto start_interp = std::chrono::high_resolution_clock::now();
+  broadcastRegressionPlaneTF(centroid_point, rotation_matrix, "map", "regression_plane_frame");
+#endif
+
+  pcl::PointCloud<pcl::PointXYZ> interpolated_cloud;
+  interpolatePointCloud(transformed_cloud, interpolated_cloud);
+
+#if DEBUG
+  auto stop_interp = std::chrono::high_resolution_clock::now();
+  auto duration_interp =
+    std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
+  std::cout << "Time for interpolation in µs : " << duration_interp.count() << std::endl;
+#endif
 }
 
-void GraspablePointsDetection::downsample(
-  const sensor_msgs::msg::PointCloud2 & pcd_msg, pcl::PointCloud<pcl::PointXYZ> & downsampled_pcd)
+void GraspablePointsDetection::downsamplePointCloud(
+  const sensor_msgs::msg::PointCloud2 & cloud_msg,
+  pcl::PointCloud<pcl::PointXYZ> & downsampled_cloud)
 {
   // VoxelGrid filtering
   // Ref: http://www.pointclouds.org/documentation/tutorials/voxel_grid.php#voxelgrid
 
   // Convert to PCL data type
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
-  pcl::fromROSMsg(pcd_msg, *cloud);
+  pcl::fromROSMsg(cloud_msg, *cloud);
 
   // === Perform the actual filtering ===
 
@@ -113,14 +146,16 @@ void GraspablePointsDetection::downsample(
   auto kVoxelSize = graspable_points_detection::kVoxelSize;
   sor.setLeafSize(kVoxelSize, kVoxelSize, kVoxelSize);
 
-  sor.filter(downsampled_pcd);
+  sor.filter(downsampled_cloud);
 
+#if DEBUG
   // Convert to ROS msg and publish
-  sensor_msgs::msg::PointCloud2 output;
-  pcl::toROSMsg(downsampled_pcd, output);
-  output.header = pcd_msg.header;
-  output.header.frame_id = "map";  // TODO: Change frame_id
-  downsampled_point_clout_pub_->publish(output);
+  sensor_msgs::msg::PointCloud2 downsampled_cloud_msg;
+  pcl::toROSMsg(downsampled_cloud, downsampled_cloud_msg);
+  downsampled_cloud_msg.header = cloud_msg.header;
+  downsampled_cloud_msg.header.frame_id = "map";  // TODO: Change frame_id
+  downsampled_point_cloud_pub_->publish(downsampled_cloud_msg);
+#endif
 }
 
 void GraspablePointsDetection::estimateRegressionPlaneNormal(
@@ -175,6 +210,68 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
   pcl::transformPointCloud(raw_cloud, transformed_cloud, transform);
 }
 
+void GraspablePointsDetection::interpolatePointCloud(
+  const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
+  pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud)
+{
+  if (raw_cloud.empty()) return;
+
+  pcl::PointXYZ min_pt, max_pt;
+  pcl::getMinMax3D(raw_cloud, min_pt, max_pt);
+
+  float x_width = max_pt.x - min_pt.x;
+  float y_width = max_pt.y - min_pt.y;
+
+  std::vector<float> x, y, z;
+  x.reserve(raw_cloud.size());
+  y.reserve(raw_cloud.size());
+  z.reserve(raw_cloud.size());
+
+  for (const auto & point : raw_cloud.points) {
+    x.push_back(point.x);
+    y.push_back(point.y);
+    z.push_back(point.z);
+  }
+
+  _2D::LinearDelaunayTriangleInterpolator<float> delaunay_interpolator;
+  delaunay_interpolator.setData(x, y, z);
+
+  // Compute grid size
+  float grid_size = 1.0f /
+    (std::round(std::sqrt(raw_cloud.size() / (x_width * y_width) * (5.0f / 3.0f)) * 10000.0f) /
+     10000.0f);
+
+  if constexpr (graspable_points_detection::kArtificiallyAddPoints) {
+    float min_grid = graspable_points_detection::kVoxelSize * 2.0f;
+    while (grid_size > min_grid) {
+      grid_size /= 1.2f;
+    }
+  }
+
+  // Grid Generation and Interpolation
+  int est_size = std::ceil(x_width / grid_size) * std::ceil(y_width / grid_size);
+  interpolated_cloud.reserve(est_size);
+
+  for (float curr_x = min_pt.x; curr_x <= max_pt.x; curr_x += grid_size) {
+    for (float curr_y = min_pt.y; curr_y <= max_pt.y; curr_y += grid_size) {
+      float interp_z = delaunay_interpolator(curr_x, curr_y);
+
+      if (interp_z != 0.0f && !std::isnan(interp_z)) {
+        interpolated_cloud.push_back(pcl::PointXYZ(curr_x, curr_y, interp_z));
+      }
+    }
+  }
+
+#if DEBUG
+  // Convert to ROS msg and publish
+  sensor_msgs::msg::PointCloud2 msg;
+  pcl::toROSMsg(interpolated_cloud, msg);
+  msg.header.frame_id = "regression_plane_frame";  // TODO: Change frame_id
+  msg.header.stamp = msg_stamp_;
+  interpolated_point_cloud_pub_->publish(msg);
+#endif
+}
+
 void GraspablePointsDetection::visualizeVector(
   const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,
   const std::string & frame_id, const std::string & object_name)
@@ -220,6 +317,30 @@ void GraspablePointsDetection::visualizeVector(
   marker.lifetime = rclcpp::Duration::from_nanoseconds(0);
 
   normal_vector_marker_pub_->publish(marker);
+}
+
+void GraspablePointsDetection::broadcastRegressionPlaneTF(
+  const Eigen::Vector4f & centroid, const Eigen::Matrix3f & rotation_matrix,
+  const std::string & parent_frame, const std::string & child_frame)
+{
+  geometry_msgs::msg::TransformStamped tf;
+  tf.header.stamp = this->now();
+  tf.header.frame_id = parent_frame;
+  tf.child_frame_id = child_frame;
+
+  tf.transform.translation.x = centroid.x();
+  tf.transform.translation.y = centroid.y();
+  tf.transform.translation.z = centroid.z();
+
+  Eigen::Quaternionf q(rotation_matrix);
+  q.normalize();
+
+  tf.transform.rotation.x = q.x();
+  tf.transform.rotation.y = q.y();
+  tf.transform.rotation.z = q.z();
+  tf.transform.rotation.w = q.w();
+
+  tf_broadcaster_->sendTransform(tf);
 }
 
 }  // namespace graspable_points_detection
