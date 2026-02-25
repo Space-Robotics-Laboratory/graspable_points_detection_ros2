@@ -125,6 +125,22 @@ void GraspablePointsDetection::pointCloudCallBack(
     std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
   std::cout << "Time for interpolation in µs : " << duration_interp.count() << std::endl;
 #endif
+
+  // === Voxelization ===
+
+#if DEBUG
+  auto start_voxel = std::chrono::high_resolution_clock::now();
+#endif
+
+  std::vector<std::vector<std::vector<int>>> voxel_matrix;
+  voxel_matrix = voxelizePointCloud(interpolated_cloud);
+
+#if DEBUG
+  auto stop_voxel = std::chrono::high_resolution_clock::now();
+  auto duration_voxel =
+    std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
+  std::cout << "Time for voxelization in µs : " << duration_voxel.count() << std::endl;
+#endif
 }
 
 void GraspablePointsDetection::downsamplePointCloud(
@@ -143,7 +159,7 @@ void GraspablePointsDetection::downsamplePointCloud(
   pcl::VoxelGrid<pcl::PointXYZ> sor;
   sor.setInputCloud(cloud);
 
-  auto kVoxelSize = graspable_points_detection::kVoxelSize;
+  const auto kVoxelSize = graspable_points_detection::kVoxelSize;
   sor.setLeafSize(kVoxelSize, kVoxelSize, kVoxelSize);
 
   sor.filter(downsampled_cloud);
@@ -214,7 +230,9 @@ void GraspablePointsDetection::interpolatePointCloud(
   const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
   pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud)
 {
-  if (raw_cloud.empty()) return;
+  if (raw_cloud.empty()) {
+    return;
+  }
 
   pcl::PointXYZ min_pt, max_pt;
   pcl::getMinMax3D(raw_cloud, min_pt, max_pt);
@@ -270,6 +288,42 @@ void GraspablePointsDetection::interpolatePointCloud(
   msg.header.stamp = msg_stamp_;
   interpolated_point_cloud_pub_->publish(msg);
 #endif
+}
+
+std::vector<std::vector<std::vector<int>>> GraspablePointsDetection::voxelizePointCloud(
+  const pcl::PointCloud<pcl::PointXYZ> & input_cloud)
+{
+  if (input_cloud.empty()) {
+    return {};
+  }
+
+  pcl::PointXYZ min_pt, max_pt;
+  pcl::getMinMax3D(input_cloud, min_pt, max_pt);
+
+  const float kVoxelSize = graspable_points_detection::kVoxelSize;
+
+  int x_size = static_cast<int>(std::floor((max_pt.x - min_pt.x) / kVoxelSize)) + 1;
+  int y_size = static_cast<int>(std::floor((max_pt.y - min_pt.y) / kVoxelSize)) + 1;
+  int z_size = static_cast<int>(std::floor((max_pt.z - min_pt.z) / kVoxelSize)) + 1;
+
+  std::vector<std::vector<std::vector<int>>> voxelized_grid(
+    x_size, std::vector<std::vector<int>>(y_size, std::vector<int>(z_size, 0)));
+
+  for (const auto & point : input_cloud.points) {
+    // offset the point by the minimum coordinate so minimum is now 0 then divide by resolution to know in which voxel the point is.
+    int idx_x = static_cast<int>((point.x - min_pt.x) / kVoxelSize + (kVoxelSize / 4.0f));
+    int idx_y = static_cast<int>((point.y - min_pt.y) / kVoxelSize + (kVoxelSize / 4.0f));
+    int idx_z = static_cast<int>((point.z - min_pt.z) / kVoxelSize + (kVoxelSize / 4.0f));
+
+    // Bounds checking to avoid segmentation fault.
+    if (
+      idx_x >= 0 && idx_x < x_size && idx_y >= 0 && idx_y < y_size && idx_z >= 0 &&
+      idx_z < z_size) {
+      voxelized_grid[idx_x][idx_y][idx_z] = 1;
+    }
+  }
+
+  return voxelized_grid;
 }
 
 void GraspablePointsDetection::visualizeVector(

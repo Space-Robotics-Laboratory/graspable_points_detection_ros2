@@ -73,6 +73,9 @@ private:
     const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
     pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud);
 
+  std::vector<std::vector<std::vector<int>>> voxelizePointCloud(
+    const pcl::PointCloud<pcl::PointXYZ> & input_cloud);
+
   void visualizeVector(
     const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,
     const std::string & frame_id, const std::string & object_name);
