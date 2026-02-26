@@ -54,11 +54,21 @@ public:
   virtual ~GraspablePointsDetection();
 
 private:
+  // Structure holding a voxel index (integer) of graspable point
   struct GraspPoint
   {
     int x;
     int y;
     int z;
+    float score;
+  };
+
+  // Structure holding real numbers ([m]) in the physical coordinate system of graspable point
+  struct GraspPoint3D
+  {
+    float x;
+    float y;
+    float z;
     float score;
   };
 
@@ -89,6 +99,9 @@ private:
   std::vector<GraspPoint> evaluateVoxelMatching(
     const std::vector<std::vector<std::vector<int>>> & terrain_matrix,
     const std::array<float, 3> & offset_vector);
+
+  std::vector<GraspPoint3D> retransformToPhysical(
+    const std::vector<GraspPoint> & voxel_points, const std::array<float, 3> & offset_vector);
 
   void visualizeVector(
     const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,

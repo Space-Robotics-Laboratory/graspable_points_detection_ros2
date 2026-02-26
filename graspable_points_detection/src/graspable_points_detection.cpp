@@ -222,6 +222,13 @@ void GraspablePointsDetection::pointCloudCallBack(
     std::chrono::duration_cast<std::chrono::microseconds>(stop_matching - start_matching);
   std::cout << "Time for voxel matching in µs : " << duration_matching.count() << std::endl;
 #endif
+
+  // === Re-transform ===
+
+  // NOTE: Re-transform only to the regression plane frame, NOT to robot-based frame, for better visualization
+  // If you want to further retransform to input camera depth optical frame, you have to modify the function
+  std::vector<GraspPoint3D> physical_graspable_points =
+    retransformToPhysical(graspable_points, offset_vec_for_retransform);
 }
 
 void GraspablePointsDetection::downsamplePointCloud(
@@ -545,6 +552,35 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
   }
 
   return graspable_points;
+}
+
+std::vector<GraspablePointsDetection::GraspPoint3D> GraspablePointsDetection::retransformToPhysical(
+  const std::vector<GraspPoint> & voxel_points, const std::array<float, 3> & offset_vector)
+{
+  std::vector<GraspPoint3D> physical_points;
+
+  if (voxel_points.empty()) {
+    return physical_points;
+  }
+
+  physical_points.reserve(voxel_points.size());
+
+  using namespace graspable_points_detection;
+
+  // Re-transformation using the parameters in the voxelization step
+  for (const auto & pt : voxel_points) {
+    GraspPoint3D phys_pt;
+
+    // ?: Is the calculation "- (kVoxelSize / 4.0f)" necessary?
+    phys_pt.x = (static_cast<float>(pt.x) - (kVoxelSize / 4.0f)) * kVoxelSize + offset_vector[0];
+    phys_pt.y = (static_cast<float>(pt.y) - (kVoxelSize / 4.0f)) * kVoxelSize + offset_vector[1];
+    phys_pt.z = (static_cast<float>(pt.z) - (kVoxelSize / 4.0f)) * kVoxelSize + offset_vector[2];
+    phys_pt.score = pt.score;
+
+    physical_points.push_back(phys_pt);
+  }
+
+  return physical_points;
 }
 
 void GraspablePointsDetection::visualizeVector(
