@@ -160,18 +160,11 @@ void GraspablePointsDetection::detectGraspablePoints(
 
   // === Transformation ===
 
-  Eigen::Vector4f centroid_point;
-  Eigen::Matrix3f rotation_matrix;
   pcl::PointCloud<pcl::PointXYZ> transformed_cloud;
-  alignPointCloudToRegressionPlane(
-    downsampled_cloud, transformed_cloud, centroid_point, rotation_matrix);
+  alignPointCloudAndBroadcastTF(
+    downsampled_cloud, transformed_cloud, received_cloud_frame_id_, kRegressionPlaneFrameId_);
 
   // === Interpolation ===
-
-#if DEBUG
-  broadcastRegressionPlaneTF(
-    centroid_point, rotation_matrix, received_cloud_frame_id_, "regression_plane_frame");
-#endif
 
   pcl::PointCloud<pcl::PointXYZ> interpolated_cloud;
   interpolatePointCloud(transformed_cloud, interpolated_cloud);
@@ -271,14 +264,17 @@ void GraspablePointsDetection::estimateRegressionPlaneNormal(
 #endif
 }
 
-void GraspablePointsDetection::alignPointCloudToRegressionPlane(
+void GraspablePointsDetection::alignPointCloudAndBroadcastTF(
   const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
-  pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, Eigen::Vector4f & centroid,
-  Eigen::Matrix3f & rotation_matrix)
+  pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, const std::string & parent_frame_id,
+  const std::string & child_frame_id)
 {
 #if DEBUG
   auto start_time = std::chrono::high_resolution_clock::now();
 #endif
+
+  Eigen::Vector4f centroid;
+  Eigen::Matrix3f rotation_matrix;
 
   Eigen::Vector3f normal_vector;
 
@@ -312,6 +308,8 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
   auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
   RCLCPP_INFO(this->get_logger(), "Elapsed time for transformation: %ld µs", elapsed_time.count());
 #endif
+
+  broadcastRegressionPlaneTF(centroid, rotation_matrix, parent_frame_id, child_frame_id);
 }
 
 void GraspablePointsDetection::interpolatePointCloud(
@@ -669,7 +667,7 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
 
   sensor_msgs::msg::PointCloud2 graspability_score_cloud_msg;
   pcl::toROSMsg(pcl_cloud, graspability_score_cloud_msg);
-  graspability_score_cloud_msg.header.frame_id = "regression_plane_frame";
+  graspability_score_cloud_msg.header.frame_id = kRegressionPlaneFrameId_;
   graspability_score_cloud_msg.header.stamp = this->now();
 
   graspability_score_map_pub_->publish(graspability_score_cloud_msg);
@@ -703,7 +701,7 @@ void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
 
   sensor_msgs::msg::PointCloud2 cloud_msg;
   pcl::toROSMsg(pcl_cloud, cloud_msg);
-  cloud_msg.header.frame_id = "regression_plane_frame";
+  cloud_msg.header.frame_id = kRegressionPlaneFrameId_;
   cloud_msg.header.stamp = this->now();
 
   high_graspability_score_map_pub_->publish(cloud_msg);
@@ -755,7 +753,7 @@ void GraspablePointsDetection::extractClusterCentroids(
   // Convert to ROS msg and publish
   sensor_msgs::msg::PointCloud2 msg_clusters_centroid;
   pcl::toROSMsg(centroids, msg_clusters_centroid);
-  msg_clusters_centroid.header.frame_id = "regression_plane_frame";
+  msg_clusters_centroid.header.frame_id = kRegressionPlaneFrameId_;
   msg_clusters_centroid.header.stamp = this->now();
 
   clustered_graspable_points_pub_->publish(msg_clusters_centroid);
@@ -817,7 +815,7 @@ void GraspablePointsDetection::visualizeVector(
 }
 
 void GraspablePointsDetection::broadcastRegressionPlaneTF(
-  const Eigen::Vector4f & centroid, const Eigen::Matrix3f & rotation_matrix,
+  const Eigen::Vector4f & translation, const Eigen::Matrix3f & rotation_matrix,
   const std::string & parent_frame, const std::string & child_frame)
 {
   geometry_msgs::msg::TransformStamped tf;
@@ -825,9 +823,9 @@ void GraspablePointsDetection::broadcastRegressionPlaneTF(
   tf.header.frame_id = parent_frame;
   tf.child_frame_id = child_frame;
 
-  tf.transform.translation.x = centroid.x();
-  tf.transform.translation.y = centroid.y();
-  tf.transform.translation.z = centroid.z();
+  tf.transform.translation.x = translation.x();
+  tf.transform.translation.y = translation.y();
+  tf.transform.translation.z = translation.z();
 
   Eigen::Quaternionf q(rotation_matrix);
   q.normalize();

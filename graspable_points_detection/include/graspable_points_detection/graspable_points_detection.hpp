@@ -85,10 +85,10 @@ private:
     const pcl::PointCloud<pcl::PointXYZ> & input_cloud, const Eigen::Vector4f & centroid,
     Eigen::Vector3f & normal);
 
-  void alignPointCloudToRegressionPlane(
+  void alignPointCloudAndBroadcastTF(
     const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
-    pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, Eigen::Vector4f & centroid,
-    Eigen::Matrix3f & rotation_matrix);
+    pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, const std::string & parent_frame_id,
+    const std::string & child_frame_id);
 
   void interpolatePointCloud(
     const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
@@ -119,7 +119,7 @@ private:
     const std::string & frame_id, const std::string & object_name);
 
   void broadcastRegressionPlaneTF(
-    const Eigen::Vector4f & centroid, const Eigen::Matrix3f & rotation_matrix,
+    const Eigen::Vector4f & translation, const Eigen::Matrix3f & rotation_matrix,
     const std::string & parent_frame, const std::string & child_frame);
 
   void createGripperMask();
@@ -143,6 +143,7 @@ private:
   std::vector<std::vector<std::vector<int>>> gripper_mask_;
 
   std::string received_cloud_frame_id_;
+  const std::string kRegressionPlaneFrameId_ = "regression_plane_frame";
 
   builtin_interfaces::msg::Time msg_stamp_;
 };
