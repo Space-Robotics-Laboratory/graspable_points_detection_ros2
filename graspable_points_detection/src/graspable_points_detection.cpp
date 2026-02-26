@@ -90,11 +90,11 @@ const float kGripperMaskBottomVoidRadius = std::round(
   kInsideMarginOfBottomVoidDiameter);
 
 // Penalty threshold for scores [%]
-const float kMinScoreForPenalty = 60.0f;
+constexpr float kMinScoreForPenalty = 60.0f;
 
 // Color map for graspability score map
 const std::vector<std::array<int, 3>> kGraspabilityColorMap = {
-  {255, 0, 0},    // 0.0: red (Score 0)
+  {255, 0, 0},    // 0.0: red
   {255, 38, 0},   // 0.1
   {255, 77, 0},   // 0.2
   {255, 115, 0},  // 0.3
@@ -107,6 +107,8 @@ const std::vector<std::array<int, 3>> kGraspabilityColorMap = {
   {8, 144, 0}     // 1.0: green
 };
 const int kColorMapSize = kGraspabilityColorMap.size();
+
+constexpr float kColorMappingMinScore = 40.0f;
 
 }  // anonymous namespace
 
@@ -649,6 +651,8 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
 
   using namespace graspable_points_detection;
 
+  float color_mapping_min_sore = kColorMappingMinScore / 100.0f;
+
   for (const auto & pt : points) {
     pcl::PointXYZRGB p;
     p.x = pt.x;
@@ -664,25 +668,31 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
       // Convert scores (0-100) to percentages (t) ranging from 0.0 to 1.0
       float t = std::clamp(pt.score / 100.0f, 0.0f, 1.0f);
 
-      // Calculate the array index (floating-point)
-      float float_idx = t * (kColorMapSize - 1);
-      int idx1 = static_cast<int>(std::floor(float_idx));
-      int idx2 = std::min(idx1 + 1, kColorMapSize - 1);
+      if (t >= color_mapping_min_sore) {
+        // Calculate the array index (floating-point)
+        float float_idx = t * (kColorMapSize - 1);
+        int idx1 = static_cast<int>(std::floor(float_idx));
+        int idx2 = std::min(idx1 + 1, kColorMapSize - 1);
 
-      // Calculate the ratio between two keyframes
-      float local_t = float_idx - idx1;
+        // Calculate the ratio between two keyframes
+        float local_t = float_idx - idx1;
 
-      // Calculate color using Lerp
-      p.r = static_cast<uint8_t>(
-        kGraspabilityColorMap[idx1][0] +
-        (kGraspabilityColorMap[idx2][0] - kGraspabilityColorMap[idx1][0]) * local_t);
-      p.g = static_cast<uint8_t>(
-        kGraspabilityColorMap[idx1][1] +
-        (kGraspabilityColorMap[idx2][1] - kGraspabilityColorMap[idx1][1]) * local_t);
-      // p.b = static_cast<uint8_t>(
-      //   kOriginalColorMap[idx1][2] +
-      //   (kOriginalColorMap[idx2][2] - kOriginalColorMap[idx1][2]) * local_t);
-      p.b = 0;
+        // Calculate color using Lerp
+        p.r = static_cast<uint8_t>(
+          kGraspabilityColorMap[idx1][0] +
+          (kGraspabilityColorMap[idx2][0] - kGraspabilityColorMap[idx1][0]) * local_t);
+        p.g = static_cast<uint8_t>(
+          kGraspabilityColorMap[idx1][1] +
+          (kGraspabilityColorMap[idx2][1] - kGraspabilityColorMap[idx1][1]) * local_t);
+        // p.b = static_cast<uint8_t>(
+        //   kOriginalColorMap[idx1][2] +
+        //   (kOriginalColorMap[idx2][2] - kOriginalColorMap[idx1][2]) * local_t);
+        p.b = 0;
+      } else {
+        p.r = 255;
+        p.g = 0;
+        p.b = 0;
+      }
     }
 
     pcl_cloud.push_back(p);
