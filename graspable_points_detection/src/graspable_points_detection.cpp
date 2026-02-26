@@ -135,11 +135,17 @@ GraspablePointsDetection::~GraspablePointsDetection()
 void GraspablePointsDetection::pointCloudCallBack(
   const sensor_msgs::msg::PointCloud2::ConstSharedPtr received_cloud_msg)
 {
-  RCLCPP_INFO(this->get_logger(), "========== Detecting Graspable Points... ==========");
-  auto start_time = std::chrono::high_resolution_clock::now();
-
   received_cloud_frame_id_ = received_cloud_msg->header.frame_id;
   msg_stamp_ = received_cloud_msg->header.stamp;
+
+  detectGraspablePoints(received_cloud_msg);
+}
+
+void GraspablePointsDetection::detectGraspablePoints(
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr & received_cloud_msg)
+{
+  RCLCPP_INFO(this->get_logger(), "========== Detecting Graspable Points... ==========");
+  auto start_time = std::chrono::high_resolution_clock::now();
 
   // === Downsampling ===
 
@@ -216,7 +222,7 @@ void GraspablePointsDetection::pointCloudCallBack(
 }
 
 void GraspablePointsDetection::downsamplePointCloud(
-  const sensor_msgs::msg::PointCloud2 & cloud_msg,
+  const sensor_msgs::msg::PointCloud2 & input_cloud_msg,
   pcl::PointCloud<pcl::PointXYZ> & downsampled_cloud)
 {
   // VoxelGrid filtering
@@ -224,7 +230,7 @@ void GraspablePointsDetection::downsamplePointCloud(
 
   // Convert to PCL data type
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
-  pcl::fromROSMsg(cloud_msg, *cloud);
+  pcl::fromROSMsg(input_cloud_msg, *cloud);
 
   // === Perform the actual filtering ===
 
@@ -240,7 +246,7 @@ void GraspablePointsDetection::downsamplePointCloud(
   // Convert to ROS msg and publish
   sensor_msgs::msg::PointCloud2 downsampled_cloud_msg;
   pcl::toROSMsg(downsampled_cloud, downsampled_cloud_msg);
-  downsampled_cloud_msg.header = cloud_msg.header;
+  downsampled_cloud_msg.header = input_cloud_msg.header;
   downsampled_cloud_msg.header.frame_id = received_cloud_frame_id_;
   downsampled_point_cloud_pub_->publish(downsampled_cloud_msg);
 #endif

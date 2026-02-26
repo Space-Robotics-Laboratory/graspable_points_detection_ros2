@@ -72,10 +72,13 @@ private:
     float score;
   };
 
-  void pointCloudCallBack(const sensor_msgs::msg::PointCloud2::ConstSharedPtr point_cloud_msg);
+  void pointCloudCallBack(const sensor_msgs::msg::PointCloud2::ConstSharedPtr received_cloud_msg);
+
+  void detectGraspablePoints(
+    const sensor_msgs::msg::PointCloud2::ConstSharedPtr & received_cloud_msg);
 
   void downsamplePointCloud(
-    const sensor_msgs::msg::PointCloud2 & pcd_msg,
+    const sensor_msgs::msg::PointCloud2 & input_cloud_msg,
     pcl::PointCloud<pcl::PointXYZ> & downsampled_cloud);
 
   void estimateRegressionPlaneNormal(
