@@ -99,6 +99,11 @@ namespace graspable_points_detection
 GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & options)
 : rclcpp::Node("graspable_points_detection", options)
 {
+  // Parameters
+  this->declare_parameter<std::string>("subscribed_topic_name", "/map_point_cloud");
+
+  std::string topic_name = this->get_parameter("subscribed_topic_name").as_string();
+
   // Publishers
   downsampled_point_cloud_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/downsampled_points", 1);
@@ -116,7 +121,7 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
 
   // Subscriber
   point_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "/merged_pcd", 1,  // TODO: Parameterize topic name
+    topic_name, 1,
     std::bind(&GraspablePointsDetection::pointCloudCallBack, this, std::placeholders::_1));
 
   // TF
@@ -153,7 +158,7 @@ void GraspablePointsDetection::detectGraspablePoints(
   downsamplePointCloud(*received_cloud_msg, downsampled_cloud);
 
   if (downsampled_cloud.points.size() < 3) {
-    // HACK: No faces. Process will have segmentation fault.
+    // No faces. Process will have segmentation fault.
     // RCLCPP_WARN(this->get_logger(), "");
     return;
   }

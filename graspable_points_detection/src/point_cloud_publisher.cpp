@@ -43,7 +43,7 @@ public:
     frame_id_ = this->get_parameter("frame_id").as_string();
 
     // Publisher
-    map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/merged_pcd", 1);
+    map_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/map_point_cloud", 1);
 
     std::string pkg_share_dir =
       ament_index_cpp::get_package_share_directory("graspable_points_detection");
