@@ -108,7 +108,7 @@ const std::vector<std::array<int, 3>> kGraspabilityColorMap = {
 };
 const int kColorMapSize = kGraspabilityColorMap.size();
 
-constexpr float kColorMappingMinScore = 40.0f;
+constexpr float kColorMappingMinScore = 40.0f;  // [%]
 
 constexpr float kGraspablePointsZShift =
   0.01f;  // [m] in regression plane frame (for visualization)
