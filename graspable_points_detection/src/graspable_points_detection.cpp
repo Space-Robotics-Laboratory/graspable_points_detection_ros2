@@ -54,7 +54,7 @@ using namespace graspable_points_detection;
 constexpr float kRatio = 1.0f / (kVoxelSize * 1000.0f);
 
 // Reduce or magnify the gripper's parameters to fit voxel's dimension
-// Change demensions from [mm] to [voxels]
+// Change dimensions from [mm] to [voxels]
 const float kPalmDiameter = std::round(kGripperParams.palm_diameter * kRatio);
 const float kPalmDiameterOfFingerJoints =
   std::round(kGripperParams.palm_diameter_of_finger_joints * kRatio);
