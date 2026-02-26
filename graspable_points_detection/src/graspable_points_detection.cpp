@@ -122,16 +122,7 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
   // TF
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
 
-#if DEBUG
-  auto start_mask = std::chrono::high_resolution_clock::now();
-#endif
   createGripperMask();
-#if DEBUG
-  auto stop_mask = std::chrono::high_resolution_clock::now();
-  auto duration_mask =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_mask - start_mask);
-  std::cout << "Time for creation of gripper mask in µs : " << duration_mask.count() << std::endl;
-#endif
 
   RCLCPP_INFO(this->get_logger(), "/%s node is constructed.", this->get_name());
 }
@@ -145,7 +136,7 @@ void GraspablePointsDetection::pointCloudCallBack(
   const sensor_msgs::msg::PointCloud2::ConstSharedPtr received_cloud_msg)
 {
   RCLCPP_INFO(this->get_logger(), "========== Detecting Graspable Points... ==========");
-  auto start_overall = std::chrono::high_resolution_clock::now();
+  auto start_time = std::chrono::high_resolution_clock::now();
 
   msg_stamp_ = received_cloud_msg->header.stamp;
 
@@ -162,74 +153,32 @@ void GraspablePointsDetection::pointCloudCallBack(
 
   // === Transformation ===
 
-#if DEBUG
-  auto start_transform = std::chrono::high_resolution_clock::now();
-#endif
-
   Eigen::Vector4f centroid_point;
   Eigen::Matrix3f rotation_matrix;
   pcl::PointCloud<pcl::PointXYZ> transformed_cloud;
   alignPointCloudToRegressionPlane(
     downsampled_cloud, transformed_cloud, centroid_point, rotation_matrix);
 
-#if DEBUG
-  auto stop_transform = std::chrono::high_resolution_clock::now();
-  auto duration_transform =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_transform - start_transform);
-  std::cout << "Time for transformation in µs : " << duration_transform.count() << std::endl;
-#endif
-
   // === Interpolation ===
 
 #if DEBUG
-  auto start_interp = std::chrono::high_resolution_clock::now();
   broadcastRegressionPlaneTF(centroid_point, rotation_matrix, "map", "regression_plane_frame");
 #endif
 
   pcl::PointCloud<pcl::PointXYZ> interpolated_cloud;
   interpolatePointCloud(transformed_cloud, interpolated_cloud);
 
-#if DEBUG
-  auto stop_interp = std::chrono::high_resolution_clock::now();
-  auto duration_interp =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_interp - start_interp);
-  std::cout << "Time for interpolation in µs : " << duration_interp.count() << std::endl;
-#endif
-
   // Get minimum values for re-transform
   std::array<float, 3> offset_vec_for_retransform = getMinValues(interpolated_cloud);
 
   // === Voxelization ===
 
-#if DEBUG
-  auto start_voxel = std::chrono::high_resolution_clock::now();
-#endif
-
   auto voxel_matrix = voxelizePointCloud(interpolated_cloud);
-
-#if DEBUG
-  auto stop_voxel = std::chrono::high_resolution_clock::now();
-  auto duration_voxel =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
-  std::cout << "Time for voxelization in µs : " << duration_voxel.count() << std::endl;
-#endif
 
   // === Voxel Matching ===
 
-#if DEBUG
-  auto start_matching = std::chrono::high_resolution_clock::now();
-#endif
-
   std::vector<GraspPoint> graspable_points =
     evaluateVoxelMatching(voxel_matrix, offset_vec_for_retransform);
-
-#if DEBUG
-  std::cout << "Size of graspable after voxel_matching: " << graspable_points.size() << std::endl;
-  auto stop_matching = std::chrono::high_resolution_clock::now();
-  auto duration_matching =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_matching - start_matching);
-  std::cout << "Time for voxel matching in µs : " << duration_matching.count() << std::endl;
-#endif
 
   // === Re-transformation ===
 
@@ -256,10 +205,11 @@ void GraspablePointsDetection::pointCloudCallBack(
 
   extractClusterCentroids(valid_graspable_points);
 
-  auto stop_overall = std::chrono::high_resolution_clock::now();
-  auto duration_overall =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_overall - start_overall);
-  std::cout << "Total time in ms : " << duration_overall.count() / 1000 << std::endl;
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(
+    this->get_logger(), "Total time for graspable points detection: %ld ms",
+    elapsed_time.count() / 1000);
   RCLCPP_INFO(this->get_logger(), "========== Detected Graspable Points! =============");
 }
 
@@ -318,6 +268,10 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
   pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, Eigen::Vector4f & centroid,
   Eigen::Matrix3f & rotation_matrix)
 {
+#if DEBUG
+  auto start_time = std::chrono::high_resolution_clock::now();
+#endif
+
   Eigen::Vector3f normal_vector;
 
   pcl::compute3DCentroid(raw_cloud, centroid);
@@ -344,12 +298,22 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
   transform.block<3, 1>(0, 3) = -rotation_matrix.transpose() * centroid3f;
 
   pcl::transformPointCloud(raw_cloud, transformed_cloud, transform);
+
+#if DEBUG
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(this->get_logger(), "Elapsed time for transformation: %ld µs", elapsed_time.count());
+#endif
 }
 
 void GraspablePointsDetection::interpolatePointCloud(
   const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
   pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud)
 {
+#if DEBUG
+  auto start_time = std::chrono::high_resolution_clock::now();
+#endif
+
   if (raw_cloud.empty()) {
     return;
   }
@@ -407,12 +371,20 @@ void GraspablePointsDetection::interpolatePointCloud(
   msg.header.frame_id = "regression_plane_frame";  // TODO: Change frame_id
   msg.header.stamp = msg_stamp_;
   interpolated_point_cloud_pub_->publish(msg);
+
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(this->get_logger(), "Elapsed time for interpolation: %ld µs", elapsed_time.count());
 #endif
 }
 
 std::vector<std::vector<std::vector<int>>> GraspablePointsDetection::voxelizePointCloud(
   const pcl::PointCloud<pcl::PointXYZ> & input_cloud)
 {
+#if DEBUG
+  auto start_time = std::chrono::high_resolution_clock::now();
+#endif
+
   if (input_cloud.empty()) {
     return {};
   }
@@ -443,6 +415,12 @@ std::vector<std::vector<std::vector<int>>> GraspablePointsDetection::voxelizePoi
     }
   }
 
+#if DEBUG
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(this->get_logger(), "Elapsed time for voxelization: %ld µs", elapsed_time.count());
+#endif
+
   return voxelized_grid;
 }
 
@@ -463,6 +441,10 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
   const std::vector<std::vector<std::vector<int>>> & terrain_matrix,
   const std::array<float, 3> & offset_vector)
 {
+#if DEBUG
+  auto start_time = std::chrono::high_resolution_clock::now();
+#endif
+
   std::vector<GraspPoint> graspable_points;
 
   if (terrain_matrix.empty() || terrain_matrix[0].empty() || terrain_matrix[0][0].empty()) {
@@ -568,6 +550,15 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
     }
   }
 
+#if DEBUG
+  RCLCPP_INFO(
+    this->get_logger(), "Size of graspable points after voxel matching: %ld",
+    graspable_points.size());
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(this->get_logger(), "Elapsed time for voxel matching: %ld µs", elapsed_time.count());
+#endif
+
   return graspable_points;
 }
 
@@ -631,7 +622,7 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
     p.x = pt.x;
     p.y = pt.y;
     p.z = pt.z;
-    p.b = 0;  // 基本的に青は使わない
+    p.b = 0;
 
     // If the Z-axis is below the lower threshold, color is forcibly set to “white”.
     if (pt.z < kDeleteLowerTargetsThreshold) {
@@ -698,7 +689,8 @@ void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
   }
 
 #if DEBUG
-  std::cout << "Points seen as graspable: " << pcl_cloud.size() << std::endl;
+  RCLCPP_INFO(
+    this->get_logger(), "Number of graspable points befor clustering: %ld", pcl_cloud.size());
 #endif
 
   sensor_msgs::msg::PointCloud2 cloud_msg;
@@ -713,7 +705,7 @@ void GraspablePointsDetection::extractClusterCentroids(
   const std::vector<GraspPoint3D> & valid_points)
 {
 #if DEBUG
-  auto start_cluster = std::chrono::high_resolution_clock::now();
+  auto start_time = std::chrono::high_resolution_clock::now();
 #endif
 
   if (valid_points.empty()) {
@@ -761,11 +753,11 @@ void GraspablePointsDetection::extractClusterCentroids(
   clustered_graspable_points_pub_->publish(msg_clusters_centroid);
 
 #if DEBUG
-  std::cout << "Clusters seen as graspable: " << centroids.size() << std::endl;
-  auto stop_cluster = std::chrono::high_resolution_clock::now();
-  auto duration_cluster =
-    std::chrono::duration_cast<std::chrono::microseconds>(stop_cluster - start_cluster);
-  std::cout << "Time for clustering in µs : " << duration_cluster.count() << std::endl;
+  RCLCPP_INFO(
+    this->get_logger(), "Number of graspable points after clustering: %ld", centroids.size());
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(this->get_logger(), "Elapsed time for voxel matching: %ld µs", elapsed_time.count());
 #endif
 }
 
@@ -842,6 +834,10 @@ void GraspablePointsDetection::broadcastRegressionPlaneTF(
 
 void GraspablePointsDetection::createGripperMask()
 {
+#if DEBUG
+  auto start_time = std::chrono::high_resolution_clock::now();
+#endif
+
   gripper_mask_.assign(
     kGripperMaskSize,
     std::vector<std::vector<int>>(kGripperMaskSize, std::vector<int>(kGripperMaskHeight, 0)));
@@ -903,6 +899,13 @@ void GraspablePointsDetection::createGripperMask()
       }
     }
   }
+
+#if DEBUG
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  RCLCPP_INFO(
+    this->get_logger(), "Elapsed time for creation of gripper mask: %ld µs", elapsed_time.count());
+#endif
 }
 
 }  // namespace graspable_points_detection
