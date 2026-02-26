@@ -23,24 +23,24 @@
 */
 
 #include "graspable_points_detection/graspable_points_detection.hpp"
-
-#include <algorithm>
-#include <cmath>
-
-// PCL
+#include <pcl/common/centroid.h>
 #include <pcl/common/common.h>
 #include <pcl/common/transforms.h>
-#include <pcl/features/normal_3d.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-// libInterpolate
-// #include <libInterpolate/AnyInterpolator.hpp>
-#include <libInterpolate/Interpolate.hpp>
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 
-// ROS
+#include <Eigen/Dense>
+
 #include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <libInterpolate/Interpolate.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 
 #define DEBUG true
