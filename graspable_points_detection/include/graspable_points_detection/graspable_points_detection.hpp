@@ -103,9 +103,13 @@ private:
   std::vector<GraspPoint3D> retransformToPhysical(
     const std::vector<GraspPoint> & voxel_points, const std::array<float, 3> & offset_vector);
 
+  std::vector<GraspPoint3D> extractValidGraspPoints(const std::vector<GraspPoint3D> & points);
+
   void visualizeGraspabilityScoreMap(const std::vector<GraspPoint3D> & points);
 
   void visualizeHighGraspabilityScoreMap(const std::vector<GraspPoint3D> & points);
+
+  void extractClusterCentroids(const std::vector<GraspPoint3D> & valid_points);
 
   void visualizeVector(
     const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,
@@ -122,6 +126,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr interpolated_point_cloud_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr graspability_score_map_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr high_graspability_score_map_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr clustered_graspable_points_pub_;
 
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr normal_vector_marker_pub_;
 

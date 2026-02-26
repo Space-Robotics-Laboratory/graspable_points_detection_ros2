@@ -31,6 +31,7 @@
 #include <pcl/common/transforms.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 // libInterpolate
@@ -107,6 +108,8 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/graspability_score_map", 1);
   high_graspability_score_map_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/high_graspability_score_map", 1);
+  clustered_graspable_points_pub_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("~/graspable_points", 1);
 
   normal_vector_marker_pub_ =
     this->create_publisher<visualization_msgs::msg::Marker>("~/normal_vector", 1);
@@ -145,7 +148,7 @@ void GraspablePointsDetection::pointCloudCallBack(
 
   msg_stamp_ = received_cloud_msg->header.stamp;
 
-  // === Downsample ===
+  // === Downsampling ===
 
   pcl::PointCloud<pcl::PointXYZ> downsampled_cloud;
   downsamplePointCloud(*received_cloud_msg, downsampled_cloud);
@@ -156,7 +159,7 @@ void GraspablePointsDetection::pointCloudCallBack(
     return;
   }
 
-  // === Transform ===
+  // === Transformation ===
 
 #if DEBUG
   auto start_transform = std::chrono::high_resolution_clock::now();
@@ -175,7 +178,7 @@ void GraspablePointsDetection::pointCloudCallBack(
   std::cout << "Time for transformation in µs : " << duration_transform.count() << std::endl;
 #endif
 
-  // === Interpolate ===
+  // === Interpolation ===
 
 #if DEBUG
   auto start_interp = std::chrono::high_resolution_clock::now();
@@ -227,12 +230,17 @@ void GraspablePointsDetection::pointCloudCallBack(
   std::cout << "Time for voxel matching in µs : " << duration_matching.count() << std::endl;
 #endif
 
-  // === Re-transform ===
+  // === Re-transformation ===
 
   // NOTE: Re-transform only to the regression plane frame, NOT to robot-based frame, for better visualization
   // If you want to further retransform to input camera depth optical frame, you have to modify the function
   std::vector<GraspPoint3D> physical_graspable_points =
     retransformToPhysical(graspable_points, offset_vec_for_retransform);
+
+  // === Graspable Points Filtering ===
+
+  std::vector<GraspPoint3D> valid_graspable_points =
+    extractValidGraspPoints(physical_graspable_points);
 
   // === Visualization ===
 
@@ -241,7 +249,11 @@ void GraspablePointsDetection::pointCloudCallBack(
 
   // Curvature Combined (Criterion II)
   // High graspability score map
-  visualizeHighGraspabilityScoreMap(physical_graspable_points);
+  visualizeHighGraspabilityScoreMap(valid_graspable_points);
+
+  // === Clustering ===
+
+  extractClusterCentroids(valid_graspable_points);
 }
 
 void GraspablePointsDetection::downsamplePointCloud(
@@ -581,6 +593,24 @@ std::vector<GraspablePointsDetection::GraspPoint3D> GraspablePointsDetection::re
   return physical_points;
 }
 
+std::vector<GraspablePointsDetection::GraspPoint3D>
+GraspablePointsDetection::extractValidGraspPoints(const std::vector<GraspPoint3D> & points)
+{
+  std::vector<GraspPoint3D> valid_points;
+  valid_points.reserve(points.size());
+
+  using namespace graspable_points_detection;
+
+  for (const auto & pt : points) {
+    // Extract only points where the score is above the threshold and the Z-coordinate is above the lower threshold.
+    if (pt.score >= kGraspabilityThreshold && pt.z > kDeleteLowerTargetsThreshold) {
+      valid_points.push_back(pt);
+    }
+  }
+
+  return valid_points;
+}
+
 void GraspablePointsDetection::visualizeGraspabilityScoreMap(
   const std::vector<GraspPoint3D> & points)
 {
@@ -640,27 +670,24 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
 }
 
 void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
-  const std::vector<GraspPoint3D> & points)
+  const std::vector<GraspPoint3D> & valid_points)
 {
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud;
-  pcl_cloud.reserve(points.size());
+  pcl_cloud.reserve(valid_points.size());
 
   using namespace graspable_points_detection;
 
-  for (const auto & pt : points) {
-    // Extract only points where the score is above the threshold and the Z-coordinate is above the lower threshold.
-    if (pt.score >= kGraspabilityThreshold && pt.z > kDeleteLowerTargetsThreshold) {
-      pcl::PointXYZRGB p;
-      p.x = pt.x;
-      p.y = pt.y;
-      p.z = pt.z;
-      // Magenta
-      p.r = 128;
-      p.g = 0;
-      p.b = 128;
+  for (const auto & pt : valid_points) {
+    pcl::PointXYZRGB p;
+    p.x = pt.x;
+    p.y = pt.y;
+    p.z = pt.z;
+    // Magenta
+    p.r = 128;
+    p.g = 0;
+    p.b = 128;
 
-      pcl_cloud.push_back(p);
-    }
+    pcl_cloud.push_back(p);
   }
 
 #if DEBUG
@@ -673,6 +700,66 @@ void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
   cloud_msg.header.stamp = this->now();
 
   high_graspability_score_map_pub_->publish(cloud_msg);
+}
+
+void GraspablePointsDetection::extractClusterCentroids(
+  const std::vector<GraspPoint3D> & valid_points)
+{
+#if DEBUG
+  auto start_cluster = std::chrono::high_resolution_clock::now();
+#endif
+
+  if (valid_points.empty()) {
+    return;
+  }
+
+  // Convert to PCL cloud for clustering
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  cloud->reserve(valid_points.size());
+  for (const auto & pt : valid_points) {
+    cloud->push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
+  }
+
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+  tree->setInputCloud(cloud);
+
+  using namespace graspable_points_detection;
+
+  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+  ec.setClusterTolerance(kPalmDiameter * 0.001f);
+  ec.setMinClusterSize(1);
+  ec.setMaxClusterSize(25000);
+  ec.setSearchMethod(tree);
+  ec.setInputCloud(cloud);
+
+  std::vector<pcl::PointIndices> cluster_indices;
+  ec.extract(cluster_indices);
+
+  // Compute centroids
+  pcl::PointCloud<pcl::PointXYZ> centroids;
+  centroids.reserve(cluster_indices.size());
+
+  for (const auto & indices : cluster_indices) {
+    Eigen::Vector4f centroid;
+    pcl::compute3DCentroid(*cloud, indices.indices, centroid);
+    centroids.push_back(pcl::PointXYZ(centroid[0], centroid[1], centroid[2]));
+  }
+
+  // Convert to ROS msg and publish
+  sensor_msgs::msg::PointCloud2 msg_clusters_centroid;
+  pcl::toROSMsg(centroids, msg_clusters_centroid);
+  msg_clusters_centroid.header.frame_id = "regression_plane_frame";
+  msg_clusters_centroid.header.stamp = this->now();
+
+  clustered_graspable_points_pub_->publish(msg_clusters_centroid);
+
+#if DEBUG
+  std::cout << "Clusters seen as graspable: " << centroids.size() << std::endl;
+  auto stop_cluster = std::chrono::high_resolution_clock::now();
+  auto duration_cluster =
+    std::chrono::duration_cast<std::chrono::microseconds>(stop_cluster - start_cluster);
+  std::cout << "Time for clustering in µs : " << duration_cluster.count() << std::endl;
+#endif
 }
 
 void GraspablePointsDetection::visualizeVector(
