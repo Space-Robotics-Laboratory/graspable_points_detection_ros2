@@ -16,8 +16,8 @@ AlignOperands: DontAlign
 
 # Do not align trailing comments
 AlignTrailingComments:
-  Kind: Never
-  OverEmptyLines: 2
+  Kind: Always
+  OverEmptyLines: 0
 
 # Allows short functions to remain on a single line only if they are inline
 AllowShortFunctionsOnASingleLine: InlineOnly
@@ -49,6 +49,9 @@ ContinuationIndentWidth: 2
 DerivePointerAlignment: false
 # Aligns pointers in the middle
 PointerAlignment: Middle
+
+# Formatting off for one line
+OneLineFormatOffRegex: ^(// NOLINT|logger$)
 
 # Disables automatic reformatting of comments
 ReflowComments: false
