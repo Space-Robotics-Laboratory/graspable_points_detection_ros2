@@ -79,16 +79,16 @@ private:
     pcl::PointCloud<pcl::PointXYZ> & downsampled_cloud);
 
   void estimateRegressionPlaneNormal(
-    const pcl::PointCloud<pcl::PointXYZ> & raw_cloud, const Eigen::Vector4f & centroid,
+    const pcl::PointCloud<pcl::PointXYZ> & input_cloud, const Eigen::Vector4f & centroid,
     Eigen::Vector3f & normal);
 
   void alignPointCloudToRegressionPlane(
-    const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
+    const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
     pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, Eigen::Vector4f & centroid,
     Eigen::Matrix3f & rotation_matrix);
 
   void interpolatePointCloud(
-    const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
+    const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
     pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud);
 
   std::vector<std::vector<std::vector<int>>> voxelizePointCloud(

@@ -247,11 +247,11 @@ void GraspablePointsDetection::downsamplePointCloud(
 }
 
 void GraspablePointsDetection::estimateRegressionPlaneNormal(
-  const pcl::PointCloud<pcl::PointXYZ> & raw_cloud, const Eigen::Vector4f & centroid,
+  const pcl::PointCloud<pcl::PointXYZ> & input_cloud, const Eigen::Vector4f & centroid,
   Eigen::Vector3f & normal)
 {
   Eigen::Matrix3f covariance_matrix;
-  pcl::computeCovarianceMatrixNormalized(raw_cloud, centroid, covariance_matrix);
+  pcl::computeCovarianceMatrixNormalized(input_cloud, centroid, covariance_matrix);
 
   // Compute normals by Principal Component Analysis (PCA)
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> pca(covariance_matrix, Eigen::ComputeEigenvectors);
@@ -266,7 +266,7 @@ void GraspablePointsDetection::estimateRegressionPlaneNormal(
 }
 
 void GraspablePointsDetection::alignPointCloudToRegressionPlane(
-  const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
+  const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
   pcl::PointCloud<pcl::PointXYZ> & transformed_cloud, Eigen::Vector4f & centroid,
   Eigen::Matrix3f & rotation_matrix)
 {
@@ -276,9 +276,9 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
 
   Eigen::Vector3f normal_vector;
 
-  pcl::compute3DCentroid(raw_cloud, centroid);
+  pcl::compute3DCentroid(input_cloud, centroid);
 
-  estimateRegressionPlaneNormal(raw_cloud, centroid, normal_vector);
+  estimateRegressionPlaneNormal(input_cloud, centroid, normal_vector);
   Eigen::Vector3f centroid3f = centroid.head<3>();
 
   // Adjusting the direction of the normal vector
@@ -299,7 +299,7 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
   transform.block<3, 3>(0, 0) = rotation_matrix.transpose();
   transform.block<3, 1>(0, 3) = -rotation_matrix.transpose() * centroid3f;
 
-  pcl::transformPointCloud(raw_cloud, transformed_cloud, transform);
+  pcl::transformPointCloud(input_cloud, transformed_cloud, transform);
 
 #if DEBUG
   auto end_time = std::chrono::high_resolution_clock::now();
@@ -309,29 +309,29 @@ void GraspablePointsDetection::alignPointCloudToRegressionPlane(
 }
 
 void GraspablePointsDetection::interpolatePointCloud(
-  const pcl::PointCloud<pcl::PointXYZ> & raw_cloud,
+  const pcl::PointCloud<pcl::PointXYZ> & input_cloud,
   pcl::PointCloud<pcl::PointXYZ> & interpolated_cloud)
 {
 #if DEBUG
   auto start_time = std::chrono::high_resolution_clock::now();
 #endif
 
-  if (raw_cloud.empty()) {
+  if (input_cloud.empty()) {
     return;
   }
 
   pcl::PointXYZ min_pt, max_pt;
-  pcl::getMinMax3D(raw_cloud, min_pt, max_pt);
+  pcl::getMinMax3D(input_cloud, min_pt, max_pt);
 
   float x_width = max_pt.x - min_pt.x;
   float y_width = max_pt.y - min_pt.y;
 
   std::vector<float> x, y, z;
-  x.reserve(raw_cloud.size());
-  y.reserve(raw_cloud.size());
-  z.reserve(raw_cloud.size());
+  x.reserve(input_cloud.size());
+  y.reserve(input_cloud.size());
+  z.reserve(input_cloud.size());
 
-  for (const auto & point : raw_cloud.points) {
+  for (const auto & point : input_cloud.points) {
     x.push_back(point.x);
     y.push_back(point.y);
     z.push_back(point.z);
@@ -342,7 +342,7 @@ void GraspablePointsDetection::interpolatePointCloud(
 
   // Compute grid size
   float grid_size = 1.0f /
-    (std::round(std::sqrt(raw_cloud.size() / (x_width * y_width) * (5.0f / 3.0f)) * 10000.0f) /
+    (std::round(std::sqrt(input_cloud.size() / (x_width * y_width) * (5.0f / 3.0f)) * 10000.0f) /
      10000.0f);
 
   if constexpr (graspable_points_detection::kArtificiallyAddPoints) {
