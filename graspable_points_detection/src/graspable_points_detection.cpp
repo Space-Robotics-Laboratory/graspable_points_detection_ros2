@@ -145,6 +145,7 @@ void GraspablePointsDetection::pointCloudCallBack(
   const sensor_msgs::msg::PointCloud2::ConstSharedPtr received_cloud_msg)
 {
   RCLCPP_INFO(this->get_logger(), "========== Detecting Graspable Points... ==========");
+  auto start_overall = std::chrono::high_resolution_clock::now();
 
   msg_stamp_ = received_cloud_msg->header.stamp;
 
@@ -254,6 +255,12 @@ void GraspablePointsDetection::pointCloudCallBack(
   // === Clustering ===
 
   extractClusterCentroids(valid_graspable_points);
+
+  auto stop_overall = std::chrono::high_resolution_clock::now();
+  auto duration_overall =
+    std::chrono::duration_cast<std::chrono::microseconds>(stop_overall - start_overall);
+  std::cout << "Total time in ms : " << duration_overall.count() / 1000 << std::endl;
+  RCLCPP_INFO(this->get_logger(), "========== Detected Graspable Points! =============");
 }
 
 void GraspablePointsDetection::downsamplePointCloud(
