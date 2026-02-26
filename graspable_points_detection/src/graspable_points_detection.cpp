@@ -110,6 +110,9 @@ const int kColorMapSize = kGraspabilityColorMap.size();
 
 constexpr float kColorMappingMinScore = 40.0f;
 
+constexpr float kGraspablePointsZShift =
+  0.01f;  // [m] in regression plane frame (for visualization)
+
 }  // anonymous namespace
 
 namespace graspable_points_detection
@@ -132,8 +135,10 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/graspability_score_map", 1);
   high_graspability_score_map_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/high_graspability_score_map", 1);
-  clustered_graspable_points_pub_ =
-    this->create_publisher<sensor_msgs::msg::PointCloud2>("~/graspable_points", 1);
+  graspable_poses_pub_ =
+    this->create_publisher<geometry_msgs::msg::PoseArray>("~/graspable_points", 1);
+  graspable_points_marker_pub_ =
+    this->create_publisher<visualization_msgs::msg::Marker>("~/graspable_points_marker", 1);
 
   normal_vector_marker_pub_ =
     this->create_publisher<visualization_msgs::msg::Marker>("~/normal_vector", 1);
@@ -783,13 +788,49 @@ void GraspablePointsDetection::extractClusterCentroids(
     graspable_points.push_back(pcl::PointXYZ(centroid[0], centroid[1], centroid[2]));
   }
 
-  // Convert to ROS msg and publish
-  sensor_msgs::msg::PointCloud2 graspable_points_msg;
-  pcl::toROSMsg(graspable_points, graspable_points_msg);
-  graspable_points_msg.header.frame_id = kRegressionPlaneFrameId_;
-  graspable_points_msg.header.stamp = msg_stamp_;
+  // Graspable points pose msg for planner
+  geometry_msgs::msg::PoseArray graspable_poses_msg;
+  graspable_poses_msg.header.frame_id = kRegressionPlaneFrameId_;
+  graspable_poses_msg.header.stamp = msg_stamp_;
 
-  clustered_graspable_points_pub_->publish(graspable_points_msg);
+  for (const auto & pt : graspable_points) {
+    geometry_msgs::msg::Pose pose;
+    pose.position.x = pt.x;
+    pose.position.y = pt.y;
+    pose.position.z = pt.z;
+
+    pose.orientation.x = 0.0;
+    pose.orientation.y = 0.0;
+    pose.orientation.z = 0.0;
+    pose.orientation.w = 1.0;
+
+    graspable_poses_msg.poses.push_back(pose);
+  }
+
+  // Graspable points marker msg for visualization
+  visualization_msgs::msg::Marker marker;
+  marker.header.frame_id = kRegressionPlaneFrameId_;
+  marker.header.stamp = msg_stamp_;
+  marker.ns = "graspable_points";
+  marker.id = 0;
+  marker.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.scale.x = marker.scale.y = marker.scale.z = 0.03;  // [m]
+  marker.color.r = 0.0f;
+  marker.color.g = 1.0f;
+  marker.color.b = 1.0f;
+  marker.color.a = 1.0f;
+
+  for (const auto & pt : graspable_points) {
+    geometry_msgs::msg::Point p;
+    p.x = pt.x;
+    p.y = pt.y;
+    p.z = pt.z + kGraspablePointsZShift;
+    marker.points.push_back(p);
+  }
+
+  graspable_poses_pub_->publish(graspable_poses_msg);
+  graspable_points_marker_pub_->publish(marker);
 
 #if DEBUG
   RCLCPP_INFO(

@@ -38,6 +38,7 @@
 #include "graspable_points_detection/gripper_params.hpp"
 #include "graspable_points_detection/matching_params.hpp"
 #include "graspable_points_detection/visibility_control.hpp"
+#include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <visualization_msgs/msg/marker.hpp>
@@ -131,7 +132,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr interpolated_point_cloud_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr graspability_score_map_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr high_graspability_score_map_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr clustered_graspable_points_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr graspable_poses_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr graspable_points_marker_pub_;
 
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr normal_vector_marker_pub_;
 
