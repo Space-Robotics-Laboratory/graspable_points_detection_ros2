@@ -103,6 +103,10 @@ GraspablePointsDetection::GraspablePointsDetection(const rclcpp::NodeOptions & o
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/downsampled_points", 1);
   interpolated_point_cloud_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("~/interpolated_points", 1);
+  graspability_score_map_pub_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("~/graspability_score_map", 1);
+  high_graspability_score_map_pub_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("~/high_graspability_score_map", 1);
 
   normal_vector_marker_pub_ =
     this->create_publisher<visualization_msgs::msg::Marker>("~/normal_vector", 1);
@@ -229,6 +233,15 @@ void GraspablePointsDetection::pointCloudCallBack(
   // If you want to further retransform to input camera depth optical frame, you have to modify the function
   std::vector<GraspPoint3D> physical_graspable_points =
     retransformToPhysical(graspable_points, offset_vec_for_retransform);
+
+  // === Visualization ===
+
+  // Graspability score map (Criterion I)
+  visualizeGraspabilityScoreMap(physical_graspable_points);
+
+  // Curvature Combined (Criterion II)
+  // High graspability score map
+  visualizeHighGraspabilityScoreMap(physical_graspable_points);
 }
 
 void GraspablePointsDetection::downsamplePointCloud(
@@ -581,6 +594,100 @@ std::vector<GraspablePointsDetection::GraspPoint3D> GraspablePointsDetection::re
   }
 
   return physical_points;
+}
+
+void GraspablePointsDetection::visualizeGraspabilityScoreMap(
+  const std::vector<GraspPoint3D> & points)
+{
+  pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud;
+  pcl_cloud.reserve(points.size());
+
+  using namespace graspable_points_detection;
+
+  for (const auto & pt : points) {
+    pcl::PointXYZRGB p;
+    p.x = pt.x;
+    p.y = pt.y;
+    p.z = pt.z;
+    p.b = 0;  // 基本的に青は使わない
+
+    // If the Z-axis is below the lower threshold, color is forcibly set to “white”.
+    if (pt.z < kDeleteLowerTargetsThreshold) {
+      p.r = p.g = p.b = 255;
+    }
+    // Apply a gradient from green to red based on the score.
+    else {
+      int score = static_cast<int>(pt.score);
+
+      if (score >= 90) {
+        p.r = 8;
+        p.g = 144;
+      } else if (score >= 80) {
+        p.r = 99;
+        p.g = 255;
+      } else if (score >= 70) {
+        p.r = 214;
+        p.g = 255;
+      } else if (score >= 60) {
+        p.r = 255;
+        p.g = 255;
+      } else if (score >= 50) {
+        p.r = 255;
+        p.g = 193;
+      } else if (score >= 40) {
+        p.r = 255;
+        p.g = 154;
+      } else {
+        p.r = 255;
+        p.g = 0;
+      }
+    }
+
+    pcl_cloud.push_back(p);
+  }
+
+  sensor_msgs::msg::PointCloud2 graspability_score_cloud_msg;
+  pcl::toROSMsg(pcl_cloud, graspability_score_cloud_msg);
+  graspability_score_cloud_msg.header.frame_id = "regression_plane_frame";
+  graspability_score_cloud_msg.header.stamp = this->now();
+
+  graspability_score_map_pub_->publish(graspability_score_cloud_msg);
+}
+
+void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
+  const std::vector<GraspPoint3D> & points)
+{
+  pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud;
+  pcl_cloud.reserve(points.size());
+
+  using namespace graspable_points_detection;
+
+  for (const auto & pt : points) {
+    // Extract only points where the score is above the threshold and the Z-coordinate is above the lower threshold.
+    if (pt.score >= kGraspabilityThreshold && pt.z > kDeleteLowerTargetsThreshold) {
+      pcl::PointXYZRGB p;
+      p.x = pt.x;
+      p.y = pt.y;
+      p.z = pt.z;
+      // Magenta
+      p.r = 128;
+      p.g = 0;
+      p.b = 128;
+
+      pcl_cloud.push_back(p);
+    }
+  }
+
+#if DEBUG
+  std::cout << "Points seen as graspable: " << pcl_cloud.size() << std::endl;
+#endif
+
+  sensor_msgs::msg::PointCloud2 cloud_msg;
+  pcl::toROSMsg(pcl_cloud, cloud_msg);
+  cloud_msg.header.frame_id = "regression_plane_frame";
+  cloud_msg.header.stamp = this->now();
+
+  high_graspability_score_map_pub_->publish(cloud_msg);
 }
 
 void GraspablePointsDetection::visualizeVector(
