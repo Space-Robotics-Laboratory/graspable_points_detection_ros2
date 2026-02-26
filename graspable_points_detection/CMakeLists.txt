@@ -43,8 +43,14 @@ target_link_libraries(${PROJECT_NAME}_node
   Eigen3::Eigen
 )
 
+# for testing
+ament_auto_add_executable(point_cloud_publisher
+  src/point_cloud_publisher.cpp
+)
+target_link_libraries(point_cloud_publisher ${PCL_LIBRARIES})
+
 install(
-  DIRECTORY config launch
+  DIRECTORY config data launch
   DESTINATION share/${PROJECT_NAME}
 )
 
