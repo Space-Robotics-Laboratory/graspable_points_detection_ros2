@@ -454,21 +454,6 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
   const int size_y = terrain_matrix[0].size();
   const int size_z = terrain_matrix[0][0].size();
 
-  // === Get Max Value of the z-axis ===
-
-  // Save z subscript of solid voxels. first, find indices and values of nonzero elements in the terrain_matrix. then,
-  // convert linear indices to subscripts
-  int z_max = 0;
-  for (int i = 0; i < size_x; ++i) {
-    for (int j = 0; j < size_y; ++j) {
-      for (int k = 0; k < size_z; ++k) {
-        if (terrain_matrix[i][j][k] != 0) {
-          z_max = std::max(z_max, k);
-        }
-      }
-    }
-  }
-
   // === Search Range Computation ===
 
   using namespace graspable_points_detection;
@@ -556,7 +541,6 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
           GraspPoint pt;
           pt.x = cx;
           pt.y = cy;
-          // pt.z = z_max - cz;  // Correct the position of the voxel array of the terrain matrix // TODO: Remove here
           pt.z = cz;
           pt.score = graspability_score;
           graspable_points.push_back(pt);
@@ -817,15 +801,10 @@ void GraspablePointsDetection::createGripperMask()
           }
         }
 
-        // TODO: Remove here
-        // if (is_solid) {
-        //   // Set the element as 1
-        //   // Flip the gripper mask vertically
-        //   gripper_mask_[x][y][(kGripperMaskHeight - 1) - z] = 1;
-        // }
         if (is_solid) {
           // Set the element as 1
-          gripper_mask_[x][y][z] = 1;
+          // Flip the gripper mask vertically
+          gripper_mask_[x][y][(kGripperMaskHeight - 1) - z] = 1;
         }
       }
     }
