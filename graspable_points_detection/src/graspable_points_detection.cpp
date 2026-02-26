@@ -87,6 +87,9 @@ const float kGripperMaskBottomVoidRadius = std::round(
    std::tan(kGripperParams.closing_angle * (M_PI / 180.0))) -
   kInsideMarginOfBottomVoidDiameter);
 
+// Penalty threshold for scores [%]
+const float kMinScoreForPenalty = 60.0f;
+
 }  // anonymous namespace
 
 namespace graspable_points_detection
@@ -185,20 +188,39 @@ void GraspablePointsDetection::pointCloudCallBack(
   std::cout << "Time for interpolation in µs : " << duration_interp.count() << std::endl;
 #endif
 
+  // Get minimum values for re-transform
+  std::array<float, 3> offset_vec_for_retransform = getMinValues(interpolated_cloud);
+
   // === Voxelization ===
 
 #if DEBUG
   auto start_voxel = std::chrono::high_resolution_clock::now();
 #endif
 
-  std::vector<std::vector<std::vector<int>>> voxel_matrix;
-  voxel_matrix = voxelizePointCloud(interpolated_cloud);
+  auto voxel_matrix = voxelizePointCloud(interpolated_cloud);
 
 #if DEBUG
   auto stop_voxel = std::chrono::high_resolution_clock::now();
   auto duration_voxel =
     std::chrono::duration_cast<std::chrono::microseconds>(stop_voxel - start_voxel);
   std::cout << "Time for voxelization in µs : " << duration_voxel.count() << std::endl;
+#endif
+
+  // === Voxel Matching ===
+
+#if DEBUG
+  auto start_matching = std::chrono::high_resolution_clock::now();
+#endif
+
+  std::vector<GraspPoint> graspable_points =
+    evaluateVoxelMatching(voxel_matrix, offset_vec_for_retransform);
+
+#if DEBUG
+  std::cout << "Size of graspable after voxel_matching: " << graspable_points.size() << std::endl;
+  auto stop_matching = std::chrono::high_resolution_clock::now();
+  auto duration_matching =
+    std::chrono::duration_cast<std::chrono::microseconds>(stop_matching - start_matching);
+  std::cout << "Time for voxel matching in µs : " << duration_matching.count() << std::endl;
 #endif
 }
 
@@ -383,6 +405,146 @@ std::vector<std::vector<std::vector<int>>> GraspablePointsDetection::voxelizePoi
   }
 
   return voxelized_grid;
+}
+
+std::array<float, 3> GraspablePointsDetection::getMinValues(
+  const pcl::PointCloud<pcl::PointXYZ> & cloud)
+{
+  if (cloud.empty()) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  pcl::PointXYZ min_pt, max_pt;
+  pcl::getMinMax3D(cloud, min_pt, max_pt);
+
+  return {min_pt.x, min_pt.y, min_pt.z};
+}
+
+std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::evaluateVoxelMatching(
+  const std::vector<std::vector<std::vector<int>>> & terrain_matrix,
+  const std::array<float, 3> & offset_vector)
+{
+  std::vector<GraspPoint> graspable_points;
+
+  if (terrain_matrix.empty() || terrain_matrix[0].empty() || terrain_matrix[0][0].empty()) {
+    return graspable_points;
+  }
+
+  const int size_x = terrain_matrix.size();
+  const int size_y = terrain_matrix[0].size();
+  const int size_z = terrain_matrix[0][0].size();
+
+  // === Get Max Value of the z-axis ===
+
+  // Save z subscript of solid voxels. first, find indices and values of nonzero elements in the terrain_matrix. then,
+  // convert linear indices to subscripts
+  int z_max = 0;
+  for (int i = 0; i < size_x; ++i) {
+    for (int j = 0; j < size_y; ++j) {
+      for (int k = 0; k < size_z; ++k) {
+        if (terrain_matrix[i][j][k] != 0) {
+          z_max = std::max(z_max, k);
+        }
+      }
+    }
+  }
+
+  // === Search Range Computation ===
+
+  using namespace graspable_points_detection;
+
+  // Half size of gripper mask
+  int half_mask_x = kGripperMaskSize / 2;  // ?: static_cast<int>(kGripperMaskHalfSize);?
+  int half_mask_y = kGripperMaskSize / 2;
+
+  // To prevent the gripper from protruding beyond the point cloud boundary,
+  // the search range is narrowed inward by the mask radius plus one voxel (safety margin).
+  const int clip_margin_x = half_mask_x + 1;
+  const int clip_margin_y = half_mask_y + 1;
+
+  // Index for starting and ending the search
+  const int search_start_x = clip_margin_x;
+  const int search_end_x = size_x - clip_margin_x;
+
+  const int search_start_y = clip_margin_y;
+  const int search_end_y = size_y - clip_margin_y;
+
+  int start_z = static_cast<int>(
+    std::abs(offset_vector[2]) / kVoxelSize + kDeleteLowerTargetsThreshold / kVoxelSize);
+
+  // Offset amount to raise the z-coordinate for searching to prevent the gripper from penetrating below the ground (Z=0)
+  int z_shift = kGripperMaskHeight - kExtraSheet;
+
+  // Lambda expression to check for out-of-bounds access
+  auto is_within_bounds = [&](int x, int y, int z) {
+    return x >= 0 && x < size_x && y >= 0 && y < size_y && z >= 0 && z < size_z;
+  };
+
+  // === Main Loop for Searching ===
+
+  for (int cx = search_start_x; cx < search_end_x; ++cx) {
+    for (int cy = search_start_y; cy < search_end_y; ++cy) {
+      for (int cz = start_z; cz < size_z; ++cz) {
+        if (terrain_matrix[cx][cy][cz] == 0) {
+          continue;
+        }
+
+        // === Direct Evaluation Using 3D Convolution (Sliding Window) ===
+        // Overlay the gripper mask directly onto the target region (convolution) and
+        // count both the “total number of voxels within the region” and the “proper points that do not interfere with the gripper” in one batch.
+
+        int total_matching_voxels = 0;  // Total number of voxels within the region
+        int num_proper_points = 0;      // Number of proper points that don't interfere with gripper
+
+        for (int mx = 0; mx < kGripperMaskSize; ++mx) {
+          for (int my = 0; my < kGripperMaskSize; ++my) {
+            for (int mz = 0; mz < kGripperMaskHeight; ++mz) {
+              // Compute where the mask coordinates (mx, my, mz) correspond within the terrain matrix
+              int target_x = cx - half_mask_x + mx;
+              int target_y = cy - half_mask_y + my;
+              int target_z = cz - z_shift + mz;
+
+              if (is_within_bounds(target_x, target_y, target_z)) {
+                int val = terrain_matrix[target_x][target_y][target_z];
+                total_matching_voxels += val;
+                num_proper_points += val * gripper_mask_[mx][my][mz];
+              }
+            }
+          }
+        }
+
+        if (total_matching_voxels == 0) {
+          continue;
+        }
+
+        // === Graspability Score Computation ===
+
+        float graspability_score =
+          (static_cast<float>(num_proper_points) / total_matching_voxels) * 100.0f;
+
+        // The computed graspability score is reduced by a penalty ratio
+        // if the number of solid terrain voxels inside the subset is below a threshold (Threshold of Solid Voxels, TSV).
+        // We only penalize those points which have an erroneously high graspability score.
+        if (total_matching_voxels <= kThreshold && graspability_score >= kMinScoreForPenalty) {
+          float penalty =
+            ((kThreshold - total_matching_voxels) / static_cast<float>(kThreshold)) * 100.0f;
+          graspability_score -= penalty;
+        }
+
+        // Store voxel coordinate and score of graspable point
+        if (graspability_score >= 0.0f) {
+          GraspPoint pt;
+          pt.x = cx;
+          pt.y = cy;
+          pt.z = z_max - cz;  // Correct the position of the voxel array of the terrain matrix
+          pt.score = graspability_score;
+          graspable_points.push_back(pt);
+        }
+      }
+    }
+  }
+
+  return graspable_points;
 }
 
 void GraspablePointsDetection::visualizeVector(

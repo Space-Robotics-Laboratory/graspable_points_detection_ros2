@@ -54,6 +54,14 @@ public:
   virtual ~GraspablePointsDetection();
 
 private:
+  struct GraspPoint
+  {
+    int x;
+    int y;
+    int z;
+    float score;
+  };
+
   void pointCloudCallBack(const sensor_msgs::msg::PointCloud2::ConstSharedPtr point_cloud_msg);
 
   void downsamplePointCloud(
@@ -75,6 +83,12 @@ private:
 
   std::vector<std::vector<std::vector<int>>> voxelizePointCloud(
     const pcl::PointCloud<pcl::PointXYZ> & input_cloud);
+
+  std::array<float, 3> getMinValues(const pcl::PointCloud<pcl::PointXYZ> & cloud);
+
+  std::vector<GraspPoint> evaluateVoxelMatching(
+    const std::vector<std::vector<std::vector<int>>> & terrain_matrix,
+    const std::array<float, 3> & offset_vector);
 
   void visualizeVector(
     const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,
