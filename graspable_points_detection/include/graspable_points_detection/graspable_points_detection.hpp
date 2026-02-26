@@ -139,6 +139,8 @@ private:
   // Variables
   std::vector<std::vector<std::vector<int>>> gripper_mask_;
 
+  std::string received_cloud_frame_id_;
+
   builtin_interfaces::msg::Time msg_stamp_;
 };
 

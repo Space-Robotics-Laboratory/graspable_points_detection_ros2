@@ -18,7 +18,7 @@
   * Jitao Zheng (jitao.zheng at tum.de)
   * Ringeval-Meusnier Antonin (ringeval at insta-toulouse.fr)
   * Taku Okawara (taku.okawara.t3 at dc.tohoku.ac.jp)
-  * Kentaro Uno (unoken at astro.mech.tohoku.ac.jp)
+  * Kentaro Uno (unoken at tohoku.ac.jp)
   * \brief Every function of the graspable target detection algorithm
 */
 
@@ -138,6 +138,7 @@ void GraspablePointsDetection::pointCloudCallBack(
   RCLCPP_INFO(this->get_logger(), "========== Detecting Graspable Points... ==========");
   auto start_time = std::chrono::high_resolution_clock::now();
 
+  received_cloud_frame_id_ = received_cloud_msg->header.frame_id;
   msg_stamp_ = received_cloud_msg->header.stamp;
 
   // === Downsampling ===
@@ -162,7 +163,8 @@ void GraspablePointsDetection::pointCloudCallBack(
   // === Interpolation ===
 
 #if DEBUG
-  broadcastRegressionPlaneTF(centroid_point, rotation_matrix, "map", "regression_plane_frame");
+  broadcastRegressionPlaneTF(
+    centroid_point, rotation_matrix, received_cloud_frame_id_, "regression_plane_frame");
 #endif
 
   pcl::PointCloud<pcl::PointXYZ> interpolated_cloud;
@@ -239,7 +241,7 @@ void GraspablePointsDetection::downsamplePointCloud(
   sensor_msgs::msg::PointCloud2 downsampled_cloud_msg;
   pcl::toROSMsg(downsampled_cloud, downsampled_cloud_msg);
   downsampled_cloud_msg.header = cloud_msg.header;
-  downsampled_cloud_msg.header.frame_id = "map";  // TODO: Change frame_id
+  downsampled_cloud_msg.header.frame_id = received_cloud_frame_id_;
   downsampled_point_cloud_pub_->publish(downsampled_cloud_msg);
 #endif
 }
@@ -259,7 +261,7 @@ void GraspablePointsDetection::estimateRegressionPlaneNormal(
 
 #if DEBUG
   Eigen::Vector3f centroid3f = centroid.head<3>();
-  visualizeVector(normal, centroid3f, "map", "normal_vector");  // TODO: Change frame_id
+  visualizeVector(normal, centroid3f, received_cloud_frame_id_, "normal_vector");
 #endif
 }
 
