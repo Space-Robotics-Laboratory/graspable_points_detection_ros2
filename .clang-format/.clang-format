@@ -62,11 +62,11 @@ UseTab: Never
 # Include
 IncludeBlocks: Regroup
 IncludeCategories:
-  # Headers containing "detect_graspable_points"
-  - Regex: ".*detect_graspable_points.*"
+  # Headers containing "graspable_points_detection"
+  - Regex: ".*graspable_points_detection.*"
     Priority: 5
     CaseSensitive: true
-  - Regex: <.*detect_graspable_points.*>
+  - Regex: <.*graspable_points_detection.*>
     Priority: 5
     CaseSensitive: true
   # Project's headers

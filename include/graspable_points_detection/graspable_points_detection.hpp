@@ -35,13 +35,14 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
-#include "graspable_points_detection/gripper_params.hpp"
-#include "graspable_points_detection/matching_params.hpp"
-#include "graspable_points_detection/visibility_control.hpp"
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <visualization_msgs/msg/marker.hpp>
+
+#include "graspable_points_detection/gripper_params.hpp"
+#include "graspable_points_detection/matching_params.hpp"
+#include "graspable_points_detection/visibility_control.hpp"
 namespace graspable_points_detection
 {
 
