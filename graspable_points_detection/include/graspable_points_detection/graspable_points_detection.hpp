@@ -55,7 +55,7 @@ public:
 
 private:
   // Structure holding a voxel index (integer) of graspable point
-  struct GraspPoint
+  struct GraspablePointVoxel
   {
     int x;
     int y;
@@ -64,7 +64,7 @@ private:
   };
 
   // Structure holding real numbers ([m]) in the physical coordinate system of graspable point
-  struct GraspPoint3D
+  struct GraspablePointPhysical
   {
     float x;
     float y;
@@ -99,20 +99,22 @@ private:
 
   std::array<float, 3> getMinValues(const pcl::PointCloud<pcl::PointXYZ> & cloud);
 
-  std::vector<GraspPoint> evaluateVoxelMatching(
+  std::vector<GraspablePointVoxel> evaluateVoxelMatching(
     const std::vector<std::vector<std::vector<int>>> & terrain_matrix,
     const std::array<float, 3> & offset_vector);
 
-  std::vector<GraspPoint3D> retransformToPhysical(
-    const std::vector<GraspPoint> & voxel_points, const std::array<float, 3> & offset_vector);
+  std::vector<GraspablePointPhysical> retransformToPhysical(
+    const std::vector<GraspablePointVoxel> & voxel_points,
+    const std::array<float, 3> & offset_vector);
 
-  std::vector<GraspPoint3D> extractValidGraspPoints(const std::vector<GraspPoint3D> & points);
+  std::vector<GraspablePointPhysical> extractValidGraspablePoints(
+    const std::vector<GraspablePointPhysical> & points);
 
-  void visualizeGraspabilityScoreMap(const std::vector<GraspPoint3D> & points);
+  void visualizeGraspabilityScoreMap(const std::vector<GraspablePointPhysical> & points);
 
-  void visualizeHighGraspabilityScoreMap(const std::vector<GraspPoint3D> & points);
+  void visualizeHighGraspabilityScoreMap(const std::vector<GraspablePointPhysical> & points);
 
-  void extractClusterCentroids(const std::vector<GraspPoint3D> & valid_points);
+  void extractClusterCentroids(const std::vector<GraspablePointPhysical> & valid_points);
 
   void visualizeVector(
     const Eigen::Vector3f & direction_vector, const Eigen::Vector3f & origin_point,

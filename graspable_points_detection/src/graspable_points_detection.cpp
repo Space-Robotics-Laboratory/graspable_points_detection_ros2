@@ -158,7 +158,7 @@ void GraspablePointsDetection::detectGraspablePoints(
     return;
   }
 
-  // === Transformation ===
+  // === Transformation to Regression Plane ===
 
   pcl::PointCloud<pcl::PointXYZ> transformed_cloud;
   alignPointCloudAndBroadcastTF(
@@ -178,33 +178,34 @@ void GraspablePointsDetection::detectGraspablePoints(
 
   // === Voxel Matching ===
 
-  std::vector<GraspPoint> graspable_points =
+  std::vector<GraspablePointVoxel> voxel_grasp_candidates =
     evaluateVoxelMatching(voxel_matrix, offset_vec_for_retransform);
 
   // === Re-transformation ===
 
   // NOTE: Re-transform only to the regression plane frame, NOT to robot-based frame, for better visualization
   // If you want to further retransform to input camera depth optical frame, you have to modify the function
-  std::vector<GraspPoint3D> physical_graspable_points =
-    retransformToPhysical(graspable_points, offset_vec_for_retransform);
+  std::vector<GraspablePointPhysical> physical_grasp_candidates =
+    retransformToPhysical(voxel_grasp_candidates, offset_vec_for_retransform);
 
   // === Graspable Points Filtering ===
 
-  std::vector<GraspPoint3D> valid_graspable_points =
-    extractValidGraspPoints(physical_graspable_points);
+  // High-scored graspable point candidates
+  std::vector<GraspablePointPhysical> valid_grasp_candidates =
+    extractValidGraspablePoints(physical_grasp_candidates);
 
   // === Visualization ===
 
   // Graspability score map (Criterion I)
-  visualizeGraspabilityScoreMap(physical_graspable_points);
+  visualizeGraspabilityScoreMap(physical_grasp_candidates);
 
   // Curvature Combined (Criterion II)
   // High graspability score map
-  visualizeHighGraspabilityScoreMap(valid_graspable_points);
+  visualizeHighGraspabilityScoreMap(valid_grasp_candidates);
 
   // === Clustering ===
 
-  extractClusterCentroids(valid_graspable_points);
+  extractClusterCentroids(valid_grasp_candidates);
 
   auto end_time = std::chrono::high_resolution_clock::now();
   auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -372,11 +373,11 @@ void GraspablePointsDetection::interpolatePointCloud(
 
 #if DEBUG
   // Convert to ROS msg and publish
-  sensor_msgs::msg::PointCloud2 msg;
-  pcl::toROSMsg(interpolated_cloud, msg);
-  msg.header.frame_id = "regression_plane_frame";  // TODO: Change frame_id
-  msg.header.stamp = msg_stamp_;
-  interpolated_point_cloud_pub_->publish(msg);
+  sensor_msgs::msg::PointCloud2 interpolated_cloud_msg;
+  pcl::toROSMsg(interpolated_cloud, interpolated_cloud_msg);
+  interpolated_cloud_msg.header.frame_id = kRegressionPlaneFrameId_;
+  interpolated_cloud_msg.header.stamp = msg_stamp_;
+  interpolated_point_cloud_pub_->publish(interpolated_cloud_msg);
 
   auto end_time = std::chrono::high_resolution_clock::now();
   auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -443,7 +444,8 @@ std::array<float, 3> GraspablePointsDetection::getMinValues(
   return {min_pt.x, min_pt.y, min_pt.z};
 }
 
-std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::evaluateVoxelMatching(
+std::vector<GraspablePointsDetection::GraspablePointVoxel>
+GraspablePointsDetection::evaluateVoxelMatching(
   const std::vector<std::vector<std::vector<int>>> & terrain_matrix,
   const std::array<float, 3> & offset_vector)
 {
@@ -451,10 +453,10 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
   auto start_time = std::chrono::high_resolution_clock::now();
 #endif
 
-  std::vector<GraspPoint> graspable_points;
+  std::vector<GraspablePointVoxel> voxel_grasp_candidates;
 
   if (terrain_matrix.empty() || terrain_matrix[0].empty() || terrain_matrix[0][0].empty()) {
-    return graspable_points;
+    return voxel_grasp_candidates;
   }
 
   const int size_x = terrain_matrix.size();
@@ -545,12 +547,12 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
 
         // Store voxel coordinate and score of graspable point
         if (graspability_score >= 0.0f) {
-          GraspPoint pt;
+          GraspablePointVoxel pt;
           pt.x = cx;
           pt.y = cy;
           pt.z = cz;
           pt.score = graspability_score;
-          graspable_points.push_back(pt);
+          voxel_grasp_candidates.push_back(pt);
         }
       }
     }
@@ -559,19 +561,20 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
 #if DEBUG
   RCLCPP_INFO(
     this->get_logger(), "Size of graspable points after voxel matching: %ld",
-    graspable_points.size());
+    voxel_grasp_candidates.size());
   auto end_time = std::chrono::high_resolution_clock::now();
   auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
   RCLCPP_INFO(this->get_logger(), "Elapsed time for voxel matching: %ld µs", elapsed_time.count());
 #endif
 
-  return graspable_points;
+  return voxel_grasp_candidates;
 }
 
-std::vector<GraspablePointsDetection::GraspPoint3D> GraspablePointsDetection::retransformToPhysical(
-  const std::vector<GraspPoint> & voxel_points, const std::array<float, 3> & offset_vector)
+std::vector<GraspablePointsDetection::GraspablePointPhysical>
+GraspablePointsDetection::retransformToPhysical(
+  const std::vector<GraspablePointVoxel> & voxel_points, const std::array<float, 3> & offset_vector)
 {
-  std::vector<GraspPoint3D> physical_points;
+  std::vector<GraspablePointPhysical> physical_points;
 
   if (voxel_points.empty()) {
     return physical_points;
@@ -583,7 +586,7 @@ std::vector<GraspablePointsDetection::GraspPoint3D> GraspablePointsDetection::re
 
   // Re-transformation using the parameters in the voxelization step
   for (const auto & pt : voxel_points) {
-    GraspPoint3D phys_pt;
+    GraspablePointPhysical phys_pt;
 
     // ?: Is the calculation "- (kVoxelSize / 4.0f)" necessary?
     phys_pt.x = (static_cast<float>(pt.x) - (kVoxelSize / 4.0f)) * kVoxelSize + offset_vector[0];
@@ -597,10 +600,11 @@ std::vector<GraspablePointsDetection::GraspPoint3D> GraspablePointsDetection::re
   return physical_points;
 }
 
-std::vector<GraspablePointsDetection::GraspPoint3D>
-GraspablePointsDetection::extractValidGraspPoints(const std::vector<GraspPoint3D> & points)
+std::vector<GraspablePointsDetection::GraspablePointPhysical>
+GraspablePointsDetection::extractValidGraspablePoints(
+  const std::vector<GraspablePointPhysical> & points)
 {
-  std::vector<GraspPoint3D> valid_points;
+  std::vector<GraspablePointPhysical> valid_points;
   valid_points.reserve(points.size());
 
   using namespace graspable_points_detection;
@@ -616,7 +620,7 @@ GraspablePointsDetection::extractValidGraspPoints(const std::vector<GraspPoint3D
 }
 
 void GraspablePointsDetection::visualizeGraspabilityScoreMap(
-  const std::vector<GraspPoint3D> & points)
+  const std::vector<GraspablePointPhysical> & points)
 {
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud;
   pcl_cloud.reserve(points.size());
@@ -668,13 +672,13 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
   sensor_msgs::msg::PointCloud2 graspability_score_cloud_msg;
   pcl::toROSMsg(pcl_cloud, graspability_score_cloud_msg);
   graspability_score_cloud_msg.header.frame_id = kRegressionPlaneFrameId_;
-  graspability_score_cloud_msg.header.stamp = this->now();
+  graspability_score_cloud_msg.header.stamp = msg_stamp_;
 
   graspability_score_map_pub_->publish(graspability_score_cloud_msg);
 }
 
 void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
-  const std::vector<GraspPoint3D> & valid_points)
+  const std::vector<GraspablePointPhysical> & valid_points)
 {
   pcl::PointCloud<pcl::PointXYZRGB> pcl_cloud;
   pcl_cloud.reserve(valid_points.size());
@@ -702,13 +706,13 @@ void GraspablePointsDetection::visualizeHighGraspabilityScoreMap(
   sensor_msgs::msg::PointCloud2 cloud_msg;
   pcl::toROSMsg(pcl_cloud, cloud_msg);
   cloud_msg.header.frame_id = kRegressionPlaneFrameId_;
-  cloud_msg.header.stamp = this->now();
+  cloud_msg.header.stamp = msg_stamp_;
 
   high_graspability_score_map_pub_->publish(cloud_msg);
 }
 
 void GraspablePointsDetection::extractClusterCentroids(
-  const std::vector<GraspPoint3D> & valid_points)
+  const std::vector<GraspablePointPhysical> & valid_points)
 {
 #if DEBUG
   auto start_time = std::chrono::high_resolution_clock::now();
@@ -740,27 +744,28 @@ void GraspablePointsDetection::extractClusterCentroids(
   std::vector<pcl::PointIndices> cluster_indices;
   ec.extract(cluster_indices);
 
-  // Compute centroids
-  pcl::PointCloud<pcl::PointXYZ> centroids;
-  centroids.reserve(cluster_indices.size());
+  // Compute centroids (= graspable_points)
+  pcl::PointCloud<pcl::PointXYZ> graspable_points;
+  graspable_points.reserve(cluster_indices.size());
 
   for (const auto & indices : cluster_indices) {
     Eigen::Vector4f centroid;
     pcl::compute3DCentroid(*cloud, indices.indices, centroid);
-    centroids.push_back(pcl::PointXYZ(centroid[0], centroid[1], centroid[2]));
+    graspable_points.push_back(pcl::PointXYZ(centroid[0], centroid[1], centroid[2]));
   }
 
   // Convert to ROS msg and publish
-  sensor_msgs::msg::PointCloud2 msg_clusters_centroid;
-  pcl::toROSMsg(centroids, msg_clusters_centroid);
-  msg_clusters_centroid.header.frame_id = kRegressionPlaneFrameId_;
-  msg_clusters_centroid.header.stamp = this->now();
+  sensor_msgs::msg::PointCloud2 graspable_points_msg;
+  pcl::toROSMsg(graspable_points, graspable_points_msg);
+  graspable_points_msg.header.frame_id = kRegressionPlaneFrameId_;
+  graspable_points_msg.header.stamp = msg_stamp_;
 
-  clustered_graspable_points_pub_->publish(msg_clusters_centroid);
+  clustered_graspable_points_pub_->publish(graspable_points_msg);
 
 #if DEBUG
   RCLCPP_INFO(
-    this->get_logger(), "Number of graspable points after clustering: %ld", centroids.size());
+    this->get_logger(), "Number of graspable points after clustering: %ld",
+    graspable_points.size());
   auto end_time = std::chrono::high_resolution_clock::now();
   auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
   RCLCPP_INFO(this->get_logger(), "Elapsed time for voxel matching: %ld µs", elapsed_time.count());
@@ -789,7 +794,7 @@ void GraspablePointsDetection::visualizeVector(
 
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = frame_id;
-  marker.header.stamp = this->now();
+  marker.header.stamp = msg_stamp_;
   marker.ns = object_name;
   marker.id = 0;
   marker.type = visualization_msgs::msg::Marker::ARROW;
@@ -819,7 +824,7 @@ void GraspablePointsDetection::broadcastRegressionPlaneTF(
   const std::string & parent_frame, const std::string & child_frame)
 {
   geometry_msgs::msg::TransformStamped tf;
-  tf.header.stamp = this->now();
+  tf.header.stamp = msg_stamp_;
   tf.header.frame_id = parent_frame;
   tf.child_frame_id = child_frame;
 
