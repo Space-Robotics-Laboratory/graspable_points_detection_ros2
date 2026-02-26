@@ -556,7 +556,8 @@ std::vector<GraspablePointsDetection::GraspPoint> GraspablePointsDetection::eval
           GraspPoint pt;
           pt.x = cx;
           pt.y = cy;
-          pt.z = z_max - cz;  // Correct the position of the voxel array of the terrain matrix
+          // pt.z = z_max - cz;  // Correct the position of the voxel array of the terrain matrix // TODO: Remove here
+          pt.z = cz;
           pt.score = graspability_score;
           graspable_points.push_back(pt);
         }
@@ -816,10 +817,15 @@ void GraspablePointsDetection::createGripperMask()
           }
         }
 
+        // TODO: Remove here
+        // if (is_solid) {
+        //   // Set the element as 1
+        //   // Flip the gripper mask vertically
+        //   gripper_mask_[x][y][(kGripperMaskHeight - 1) - z] = 1;
+        // }
         if (is_solid) {
           // Set the element as 1
-          // Flip the gripper mask vertically
-          gripper_mask_[x][y][(kGripperMaskHeight - 1) - z] = 1;
+          gripper_mask_[x][y][z] = 1;
         }
       }
     }
