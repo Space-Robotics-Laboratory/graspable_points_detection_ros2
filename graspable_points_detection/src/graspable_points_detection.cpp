@@ -24,6 +24,7 @@
 
 #include "graspable_points_detection/graspable_points_detection.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 // PCL
@@ -90,6 +91,22 @@ const float kGripperMaskBottomVoidRadius = std::round(
 
 // Penalty threshold for scores [%]
 const float kMinScoreForPenalty = 60.0f;
+
+// Color map for graspability score map
+const std::vector<std::array<int, 3>> kGraspabilityColorMap = {
+  {255, 0, 0},    // 0.0: red (Score 0)
+  {255, 38, 0},   // 0.1
+  {255, 77, 0},   // 0.2
+  {255, 115, 0},  // 0.3
+  {255, 154, 0},  // 0.4
+  {255, 193, 0},  // 0.5: orange
+  {255, 255, 0},  // 0.6: yellow
+  {214, 255, 0},  // 0.7
+  {99, 255, 0},   // 0.8
+  {8, 144, 0},    // 0.9
+  {8, 144, 0}     // 1.0: green
+};
+const int kColorMapSize = kGraspabilityColorMap.size();
 
 }  // anonymous namespace
 
@@ -637,38 +654,35 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
     p.x = pt.x;
     p.y = pt.y;
     p.z = pt.z;
-    p.b = 0;
 
     // If the Z-axis is below the lower threshold, color is forcibly set to “white”.
     if (pt.z < kDeleteLowerTargetsThreshold) {
       p.r = p.g = p.b = 255;
     }
-    // Apply a gradient from green to red based on the score.
+    // Apply a gradient from red to green based on the score.
     else {
-      int score = static_cast<int>(pt.score);
+      // Convert scores (0-100) to percentages (t) ranging from 0.0 to 1.0
+      float t = std::clamp(pt.score / 100.0f, 0.0f, 1.0f);
 
-      if (score >= 90) {
-        p.r = 8;
-        p.g = 144;
-      } else if (score >= 80) {
-        p.r = 99;
-        p.g = 255;
-      } else if (score >= 70) {
-        p.r = 214;
-        p.g = 255;
-      } else if (score >= 60) {
-        p.r = 255;
-        p.g = 255;
-      } else if (score >= 50) {
-        p.r = 255;
-        p.g = 193;
-      } else if (score >= 40) {
-        p.r = 255;
-        p.g = 154;
-      } else {
-        p.r = 255;
-        p.g = 0;
-      }
+      // Calculate the array index (floating-point)
+      float float_idx = t * (kColorMapSize - 1);
+      int idx1 = static_cast<int>(std::floor(float_idx));
+      int idx2 = std::min(idx1 + 1, kColorMapSize - 1);
+
+      // Calculate the ratio between two keyframes
+      float local_t = float_idx - idx1;
+
+      // Calculate color using Lerp
+      p.r = static_cast<uint8_t>(
+        kGraspabilityColorMap[idx1][0] +
+        (kGraspabilityColorMap[idx2][0] - kGraspabilityColorMap[idx1][0]) * local_t);
+      p.g = static_cast<uint8_t>(
+        kGraspabilityColorMap[idx1][1] +
+        (kGraspabilityColorMap[idx2][1] - kGraspabilityColorMap[idx1][1]) * local_t);
+      // p.b = static_cast<uint8_t>(
+      //   kOriginalColorMap[idx1][2] +
+      //   (kOriginalColorMap[idx2][2] - kOriginalColorMap[idx1][2]) * local_t);
+      p.b = 0;
     }
 
     pcl_cloud.push_back(p);
