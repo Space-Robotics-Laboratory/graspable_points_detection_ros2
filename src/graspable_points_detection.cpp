@@ -664,40 +664,35 @@ void GraspablePointsDetection::visualizeGraspabilityScoreMap(
     p.y = pt.y;
     p.z = pt.z;
 
-    // If the Z-axis is below the lower threshold, color is forcibly set to “white”.
-    if (pt.z < kDeleteLowerTargetsThreshold) {
-      p.r = p.g = p.b = 255;
-    }
-    // Apply a gradient from red to green based on the score.
-    else {
-      // Convert scores (0-100) to percentages (t) ranging from 0.0 to 1.0
-      float t = std::clamp(pt.score / 100.0f, 0.0f, 1.0f);
+    // === Apply a gradient from red to green based on the score. ===
 
-      if (t >= color_mapping_min_sore) {
-        // Calculate the array index (floating-point)
-        float float_idx = t * (kColorMapSize - 1);
-        int idx1 = static_cast<int>(std::floor(float_idx));
-        int idx2 = std::min(idx1 + 1, kColorMapSize - 1);
+    // Convert scores (0-100) to percentages (t) ranging from 0.0 to 1.0
+    float t = std::clamp(pt.score / 100.0f, 0.0f, 1.0f);
 
-        // Calculate the ratio between two keyframes
-        float local_t = float_idx - idx1;
+    if (t >= color_mapping_min_sore) {
+      // Calculate the array index (floating-point)
+      float float_idx = t * (kColorMapSize - 1);
+      int idx1 = static_cast<int>(std::floor(float_idx));
+      int idx2 = std::min(idx1 + 1, kColorMapSize - 1);
 
-        // Calculate color using Lerp
-        p.r = static_cast<uint8_t>(
-          kGraspabilityColorMap[idx1][0] +
-          (kGraspabilityColorMap[idx2][0] - kGraspabilityColorMap[idx1][0]) * local_t);
-        p.g = static_cast<uint8_t>(
-          kGraspabilityColorMap[idx1][1] +
-          (kGraspabilityColorMap[idx2][1] - kGraspabilityColorMap[idx1][1]) * local_t);
-        // p.b = static_cast<uint8_t>(
-        //   kOriginalColorMap[idx1][2] +
-        //   (kOriginalColorMap[idx2][2] - kOriginalColorMap[idx1][2]) * local_t);
-        p.b = 0;
-      } else {
-        p.r = 255;
-        p.g = 0;
-        p.b = 0;
-      }
+      // Calculate the ratio between two keyframes
+      float local_t = float_idx - idx1;
+
+      // Calculate color using Lerp
+      p.r = static_cast<uint8_t>(
+        kGraspabilityColorMap[idx1][0] +
+        (kGraspabilityColorMap[idx2][0] - kGraspabilityColorMap[idx1][0]) * local_t);
+      p.g = static_cast<uint8_t>(
+        kGraspabilityColorMap[idx1][1] +
+        (kGraspabilityColorMap[idx2][1] - kGraspabilityColorMap[idx1][1]) * local_t);
+      // p.b = static_cast<uint8_t>(
+      //   kOriginalColorMap[idx1][2] +
+      //   (kOriginalColorMap[idx2][2] - kOriginalColorMap[idx1][2]) * local_t);
+      p.b = 0;
+    } else {
+      p.r = 255;
+      p.g = 0;
+      p.b = 0;
     }
 
     pcl_cloud.push_back(p);
