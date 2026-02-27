@@ -69,28 +69,15 @@ You will require the following packages and libraries:
     colcon build --symlink-install
     ```
 
-1. Launch nodes. You need at least two terminals.
+2. Launch nodes (`graspable_target_detection` and `point_cloud_publisher`).
 
-   - *Terminal 1*
-
-      Launch the `graspable_target_detection` node.
-
-      ```bash
-      . install/setup.bash
-      ros2 launch graspable_points_detection graspable_points_detection_debug.launch.py
-      ```
-
-   - *Terminal 2*
-
-      Launch the `point_cloud_publisher` node.
-
-      ```bash
-      . install/setup.bash
-      ros2 run graspable_points_detection point_cloud_publisher
-      ```
+    ```bash
+    . install/setup.bash
+    ros2 launch graspable_points_detection test.launch.py
+    ```
 
 > [!NOTE]
-> If you want to change example point cloud, edit `pcd_file_name` in `src/point_cloud_publisher.cpp` (line 37).
+> If you want to change example point cloud, edit `pcd_file_name` in `config/test.yaml`.
 
 ## Interfaces
 
