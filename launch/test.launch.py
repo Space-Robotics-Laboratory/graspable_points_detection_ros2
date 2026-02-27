@@ -23,7 +23,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_path = get_package_share_directory('graspable_points_detection')
     rviz_config_path = os.path.join(
-        pkg_path, 'config', 'graspable_points_detection_debug.rviz')
+        pkg_path, 'config', 'test.rviz')
 
     rviz_arg = DeclareLaunchArgument(
         name='rviz_config',
