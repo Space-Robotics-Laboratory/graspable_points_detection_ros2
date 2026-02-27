@@ -44,8 +44,8 @@ struct GripperParams
 constexpr GripperParams kHubroboParams = {32.0f, 28.0f, 15.0f, 15.0f, 5.0f, 75.0f,
                                           30.0f, 37.0f, 5.0f,  16.0f, 4.0f, 2.0f};
 
-constexpr GripperParams kLimberoParams = {64.0f, 70.0f, 38.0f, 30.0f, 10.0f,  80.0f,
-                                          3.0f,  77.0f, 5.0f,  33.0f, -10.0f, 2.0f};
+constexpr GripperParams kLimberoParams = {64.0f,  70.0f, 38.0f, 30.0f, 10.0f, 80.0f,
+                                          -10.0f, 77.0f, 5.0f,  33.0f, 4.0f,  2.0f};
 
 constexpr GripperParams kScareParams = {71.0f, 92.0f,  40.0f, 41.0f, 5.0f, 85.0f,
                                         10.0f, 136.0f, 5.0f,  90.0f, 4.0f, 2.0f};
