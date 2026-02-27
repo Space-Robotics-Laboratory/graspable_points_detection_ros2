@@ -394,7 +394,7 @@ void GraspablePointsDetection::interpolatePointCloud(
     for (float curr_y = min_pt.y; curr_y <= max_pt.y; curr_y += grid_size) {
       float interp_z = delaunay_interpolator(curr_x, curr_y);
 
-      if (interp_z != 0.0f && !std::isnan(interp_z)) {
+      if (!std::isnan(interp_z)) {
         interpolated_cloud.push_back(pcl::PointXYZ(curr_x, curr_y, interp_z));
       }
     }
