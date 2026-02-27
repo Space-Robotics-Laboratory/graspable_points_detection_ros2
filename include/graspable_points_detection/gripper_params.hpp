@@ -41,11 +41,11 @@ struct GripperParams
   float inside_margin_of_bottom_void_diameter;
 };
 
-constexpr GripperParams kHubRoboParams = {32.0f, 28.0f, 15.0f, 15.0f, 5.0f, 75.0f,
+constexpr GripperParams kHubroboParams = {32.0f, 28.0f, 15.0f, 15.0f, 5.0f, 75.0f,
                                           30.0f, 37.0f, 5.0f,  16.0f, 4.0f, 2.0f};
 
-constexpr GripperParams kLimberoParams = {85.0f, 66.0f, 17.0f, 33.0f, 0.0f, 80.0f,
-                                          3.0f,  79.0f, 2.0f,  46.0f, 4.0f, 2.0f};
+constexpr GripperParams kLimberoParams = {64.0f, 70.0f, 38.0f, 30.0f, 10.0f,  80.0f,
+                                          3.0f,  77.0f, 5.0f,  33.0f, -10.0f, 2.0f};
 
 constexpr GripperParams kScareParams = {71.0f, 92.0f,  40.0f, 41.0f, 5.0f, 85.0f,
                                         10.0f, 136.0f, 5.0f,  90.0f, 4.0f, 2.0f};
@@ -54,7 +54,7 @@ constexpr GripperParams defineGripperParams()
 {
   switch (kGripperModel) {
     case GripperModel::HUBROBO:
-      return kHubRoboParams;
+      return kHubroboParams;
     case GripperModel::LIMBERO:
       return kLimberoParams;
     case GripperModel::SCARE:
