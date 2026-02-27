@@ -109,18 +109,18 @@ Orientate yourself to the simplified dimensions of this gripper:
 
 <img src="images/Gripper_dimensions.png" alt="drawing" width="600">
 
-| No. | Variable                       | Explanation                                                                           |
-|-----|--------------------------------|---------------------------------------------------------------------------------------|
-| 1   | Palm diameter                  | Diameter of gripper's palm                                                            |
-| 2   | Palm diameter of finger joints | Distance between two opposite first finger joints                                     |
-| 3   | Finger length                  | Length of the first finger segment                                                    |
-| 4   | Spine length                   | Length of the last finger segment                                                     |
-| 5   | Spine depth                    | Length of the spine itself                                                            |
-| 6   | Opening angle                  | Maximum opening angle                                                                 |
-| 7   | Closing angle                  | Maximum closing angle                                                                 |
-| 8   | Opening spine radius           | Distance from the center of the palm to the tip of the furthest spine                 |
-| 9   | Opening spine depth            | Distance from the horizontal plane to the tip of the spine when opened                |
-| 10  | Closing height                 | Vertical distance between the tip of the spine and the bottom of the palm when closed |
+| No. | Variable                       | Unit  | Explanation                                                                           |
+|-----|--------------------------------|-------|---------------------------------------------------------------------------------------|
+| 1   | Palm diameter                  | [mm]  | Diameter of gripper's palm                                                            |
+| 2   | Palm diameter of finger joints | [mm]  | Distance between two opposite first finger joints                                     |
+| 3   | Finger length                  | [mm]  | Length of the first finger segment                                                    |
+| 4   | Spine length                   | [mm]  | Length of the last finger segment                                                     |
+| 5   | Spine depth                    | [mm]  | Length of the spine itself                                                            |
+| 6   | Opening angle                  | [deg] | Maximum opening angle                                                                 |
+| 7   | Closing angle                  | [deg] | Maximum closing angle                                                                 |
+| 8   | Opening spine radius           | [mm]  | Distance from the center of the palm to the tip of the furthest spine                 |
+| 9   | Opening spine depth            | [mm]  | Distance from the horizontal plane to the tip of the spine when opened                |
+| 10  | Closing height                 | [mm]  | Vertical distance between the tip of the spine and the bottom of the palm when closed |
 
 > [!CAUTION]
 > *TODO:* Current maintainers don't know what exactly `margin_of_top_solid_diameter` and `inside_margin_of_bottom_void_diameter` are. Please complement this README if anyone knows more.
