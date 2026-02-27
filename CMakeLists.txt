@@ -44,10 +44,10 @@ target_link_libraries(${PROJECT_NAME}_node
 )
 
 # for testing
-ament_auto_add_executable(point_cloud_publisher
+ament_auto_add_executable(point_cloud_publisher_node
   src/point_cloud_publisher.cpp
 )
-target_link_libraries(point_cloud_publisher ${PCL_LIBRARIES})
+target_link_libraries(point_cloud_publisher_node ${PCL_LIBRARIES})
 
 install(
   DIRECTORY config data launch

@@ -45,8 +45,19 @@ def generate_launch_description():
         output='screen'
     )
 
+    test_params = os.path.join(pkg_path, 'config', 'test.yaml')
+
+    point_cloud_publisher_node = Node(
+        package='graspable_points_detection',
+        executable='point_cloud_publisher_node',
+        name='point_cloud_publisher',
+        output='screen',
+        parameters=[test_params]
+    )
+
     return LaunchDescription([
         rviz_arg,
         rviz_node,
-        graspable_points_detection_node
+        graspable_points_detection_node,
+        point_cloud_publisher_node
     ])

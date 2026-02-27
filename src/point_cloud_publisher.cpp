@@ -35,11 +35,11 @@ public:
   {
     // Parameters
     this->declare_parameter<std::string>("pcd_file_name", "limbero_testfield_quartered.pcd");
-    this->declare_parameter<int>("timer_loop_rate_ms", 1000);
+    this->declare_parameter<int>("publish_rate", 1000);
     this->declare_parameter<std::string>("frame_id", "map");
 
     std::string file_name = this->get_parameter("pcd_file_name").as_string();
-    int loop_rate_ms = this->get_parameter("timer_loop_rate_ms").as_int();
+    int loop_rate_ms = this->get_parameter("publish_rate").as_int();
     frame_id_ = this->get_parameter("frame_id").as_string();
 
     // Publisher
@@ -49,7 +49,7 @@ public:
       ament_index_cpp::get_package_share_directory("graspable_points_detection");
     std::string pcd_path = pkg_share_dir + "/data/" + file_name;
 
-    RCLCPP_INFO(this->get_logger(), "Loading PCD file from: %s", pcd_path.c_str());
+    RCLCPP_INFO(this->get_logger(), "Loading PCD file from: data/%s", file_name.c_str());
 
     pcl::PointCloud<pcl::PointXYZ> map_cloud;
     if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_path, map_cloud) == -1) {
@@ -65,8 +65,8 @@ public:
       std::chrono::milliseconds(loop_rate_ms),
       std::bind(&PointCloudPublisherNode::publishMapPointCloud, this));
 
-    RCLCPP_INFO(
-      this->get_logger(), "Successfully loaded and started publishing: %s", file_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "Successfully loaded: %s", file_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing point cloud in %d ms", loop_rate_ms);
   }
 
 private:
