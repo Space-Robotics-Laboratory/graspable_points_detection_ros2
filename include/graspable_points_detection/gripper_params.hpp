@@ -44,8 +44,20 @@ struct GripperParams
 constexpr GripperParams kHubroboParams = {32.0f, 28.0f, 15.0f, 15.0f, 5.0f, 75.0f,
                                           30.0f, 37.0f, 5.0f,  16.0f, 4.0f, 2.0f};
 
-constexpr GripperParams kLimberoParams = {64.0f,  70.0f, 38.0f, 30.0f, 10.0f, 80.0f,
-                                          -10.0f, 77.0f, 5.0f,  33.0f, 4.0f,  2.0f};
+constexpr GripperParams kLimberoParams = {
+  64.0f,   // palm_diameter
+  70.0f,   // palm_diameter_of_finger_joints
+  37.8f,   // finger_length
+  37.44f,  // spine_length
+  9.09f,   // spine_depth
+  82.15f,  // opening_angle
+  -7.85f,  // closing_angle
+  79.08f,  // opening_spine_radius
+  1.96f,   // opening_spine_depth
+  34.05f,  // closing_height
+  4.0f,    // margin_of_top_solid_diameter
+  2.0f     // inside_margin_of_bottom_void_diameter
+};
 
 constexpr GripperParams kScareParams = {71.0f, 92.0f,  40.0f, 41.0f, 5.0f, 85.0f,
                                         10.0f, 136.0f, 5.0f,  90.0f, 4.0f, 2.0f};
