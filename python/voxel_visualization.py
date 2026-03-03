@@ -6,7 +6,7 @@ import plotly.express as px
 
 
 
-vector3d_gripper_cpp = pd.read_csv("/home/antonin/linked_ws/src/graspable_points_detection_ros2/pcd_data/GripperMask.csv", names=["x","y","z"])
+vector3d_gripper_cpp = pd.read_csv("/home/masazumi/gpd_ws/src/graspable_points_detection_ros2/include/pcd_data/GripperMask.csv", names=["x","y","z"])
 
 
 #vector3d_gripper_cpp = pd.read_csv("/home/jitao/Documents/Results/Voxel_array/GripperMask_matlab_2.csv", names=["x","y","z"])
@@ -22,7 +22,8 @@ def visualize_3d(vector_3d, size_mask=1):
                                 line=dict(width=2,
                                             color='DarkSlateGrey')),
                     selector=dict(mode='markers'))
-    fig.show()
+    # fig.show()
+    fig.write_html("voxel_plot.html")
     print(vector3d_gripper_cpp.size)
 # visualize_3d(vector3d_cpp)
 # visualize_3d(vector3d_matlab)
