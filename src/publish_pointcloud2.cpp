@@ -59,7 +59,7 @@ private:
   int kTimerLoopRate_ = 500;  // [ms]
 
   // Please change for the name of the map you want to send for testing
-  std::string kMapName_ = "limbero_testfield_quarted.pcd";
+  std::string kMapName_ = "limbero_testfield.pcd";
 };
 
 int main(int argc, char ** argv)

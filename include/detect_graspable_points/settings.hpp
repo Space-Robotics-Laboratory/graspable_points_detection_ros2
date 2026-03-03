@@ -11,7 +11,7 @@
 #define THRESHOLD 100  // threshold of numbers of solid voxels within the subset (TSV) (SCAR-E: 120)
 #define ARTFICIALY_ADD_POINTS \
   false  // choose wether or not you want to add more points during interpolation process in case of sparse map
-#define DELETE_LOWER_TARGETS_THRESHOLD 0.015  // [m] Lower threshold of targets
+#define DELETE_LOWER_TARGETS_THRESHOLD -0.04  // [m] Lower threshold of targets
 #define EXTRA_SHEET 3  // size of extra sheet above the top layer of gripper mask (H_add)(SCAR-E: 1)
 #define GRASPABILITY_THRESHOLD \
   90  // [%] Graspability threshold. Above which we can call it graspable with great certainty
@@ -19,18 +19,18 @@
 // gripper parameters in [mm]!
 //Limbero
 #if LIMBERO
-#define PALM_DIAMETER 85  // PALM_DIAMETER
-#define PALM_DIAMETER_OF_FINGER_JOINTS 66  //
-#define FINGER_LENGTH 17  // FINGER_LENGTH
-#define SPINE_LENGTH 33  // SPINE_LENGTH
-#define SPINE_DEPTH 0  // SPINE_DEPTH
-#define OPENING_ANGLE 80  // OPENING_ANGLE
-#define CLOSING_ANGLE 3  // CLOSING_ANGLE
+#define PALM_DIAMETER 70  // PALM_DIAMETER
+#define PALM_DIAMETER_OF_FINGER_JOINTS 70  //
+#define FINGER_LENGTH 38  // FINGER_LENGTH
+#define SPINE_LENGTH 37  // SPINE_LENGTH
+#define SPINE_DEPTH 9  // SPINE_DEPTH
+#define OPENING_ANGLE 82  // OPENING_ANGLE
+#define CLOSING_ANGLE -8  // CLOSING_ANGLE
 #define OPENING_SPINE_RADIUS \
   79  // OPENING_SPINE_RADIUS, THE DISTANCE FROM THE CENTER OF PALM TO THE FURTHEST POINT OF THE SPINES
 #define OPENING_SPINE_DEPTH 2  // OPENING_SPINE_DEPTH
 #define CLOSING_HEIGHT \
-  46  // CLOSING_HEIGHT, VERTICAL DISTANCE BETWEEN THE TIP OF THE SPINE AND THE BOTTOM OF THE PALM WHEN CLOSED
+  34  // CLOSING_HEIGHT, VERTICAL DISTANCE BETWEEN THE TIP OF THE SPINE AND THE BOTTOM OF THE PALM WHEN CLOSED
 #define MARGIN_OF_TOP_SOLID_DIAMETER 4  // MARGIN_OF_TOP_SOLID_DIAMETER
 #define INSIDE_MARGIN_OF_BOTTOM_VOID_DIAMETER 2  // inside_margin_of_bottom_void_diameter
 #endif
